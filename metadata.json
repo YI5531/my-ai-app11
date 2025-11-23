@@ -1,0 +1,9 @@
+{
+  "name": "Copy of Nexus Runner",
+  "description": "A universal runtime environment for locally imported web applications, AI Studio builds, and HTML projects. Features secure sandboxing and external link handling.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

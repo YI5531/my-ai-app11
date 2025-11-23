@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Nexus Runner</title>
+    <!-- 1. Suppress Warnings IMMEDIATELY -->
+    <script>
+      (function() {
+        const _warn = console.warn;
+        console.warn = function(...args) {
+          if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+          _warn.apply(console, args);
+        };
+      })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              nexus: {
+                dark: '#f8fafc',    /* Main Background (Light Slate) */
+                card: '#ffffff',    /* Card Surface (White) */
+                accent: '#2563eb',  /* Blue 600 */
+                success: '#10b981',
+                text: '#1e293b',    /* Slate 800 */
+                muted: '#64748b',   /* Slate 500 */
+                border: '#e2e8f0'   /* Slate 200 */
+              }
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.3s ease-out',
+              'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      body { background-color: #f8fafc; color: #1e293b; -webkit-tap-highlight-color: transparent; margin: 0; height: 100vh; overflow: hidden; }
+      #root { height: 100%; display: flex; flex-direction: column; }
+      
+      /* Loading State Styles */
+      #app-loading {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: #ffffff; z-index: 9999; transition: opacity 0.5s;
+      }
+      .loading-spinner {
+        width: 40px; height: 40px; border: 3px solid rgba(37, 99, 235, 0.1);
+        border-radius: 50%; border-top-color: #2563eb;
+        animation: spin 0.8s ease-in-out infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
+    "clsx": "https://aistudiocdn.com/clsx@^2.1.1",
+    "jszip": "https://aistudiocdn.com/jszip@^3.10.1",
+    "idb": "https://aistudiocdn.com/idb@^8.0.3"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root">
+      <!-- Fallback UI while React loads -->
+      <div id="app-loading">
+        <div class="loading-spinner"></div>
+        <p style="margin-top: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; color: #64748b; letter-spacing: 0.5px;">INITIALIZING NEXUS</p>
+      </div>
+    </div>
+    
+    <!-- Global Error Handler -->
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        const root = document.getElementById('root');
+        if (root && root.innerHTML.includes('INITIALIZING NEXUS')) {
+          root.innerHTML = `
+            <div style="padding: 40px; color: #ef4444; font-family: sans-serif; background: #ffffff; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+              <h2 style="font-size: 24px; margin-bottom: 16px; color: #1e293b; font-weight: 700;">System Error</h2>
+              <p style="color: #64748b; margin-bottom: 20px; max-width: 400px;">${msg}</p>
+              <button onclick="window.location.reload()" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;">Reload Application</button>
+            </div>
+          `;
+        }
+      };
+    </script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
