@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from 'react';
-import { X, UploadCloud, Link as LinkIcon, Folder, AlertCircle, Loader2, FileCode } from 'lucide-react';
+import { X, UploadCloud, Link as LinkIcon, Folder, AlertCircle, Loader2, FileCode, Smartphone } from 'lucide-react';
 import { processZipFile, processFolder, processSingleFile } from '../services/zipService';
 import { saveProject } from '../services/storageService';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,9 +14,12 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
   const [mode, setMode] = useState<'zip' | 'folder' | 'html' | 'url'>('zip');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const mobileFilesInputRef = useRef<HTMLInputElement>(null);
   const htmlInputRef = useRef<HTMLInputElement>(null);
+  
   const [urlInput, setUrlInput] = useState('');
 
   const handleZipChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,20 +130,38 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
              )}
 
              {mode === 'folder' && (
-                <div 
-                  onClick={() => !isProcessing && folderInputRef.current?.click()}
-                  className={`border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-nexus-accent/50 hover:bg-blue-50 transition-colors ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
-                >
-                  <input 
-                    type="file" 
-                    ref={folderInputRef} 
-                    className="hidden" 
-                    onChange={handleFolderChange} 
-                    {...{ webkitdirectory: "", directory: "", multiple: true } as any}
-                  />
-                  {isProcessing ? <Loader2 size={40} className="text-nexus-accent animate-spin mb-3" /> : <Folder size={40} className="text-nexus-muted mb-3" />}
-                  <p className="font-medium text-nexus-text">Select Folder</p>
-                  <p className="text-xs text-nexus-muted mt-1">Uploads all files in directory</p>
+                <div className="space-y-3">
+                    {/* Desktop Folder Selection */}
+                    <div 
+                      onClick={() => !isProcessing && folderInputRef.current?.click()}
+                      className={`border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-nexus-accent/50 hover:bg-blue-50 transition-colors ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <input 
+                        type="file" 
+                        ref={folderInputRef} 
+                        className="hidden" 
+                        onChange={handleFolderChange} 
+                        {...{ webkitdirectory: "", directory: "", multiple: true } as any}
+                      />
+                      {isProcessing ? <Loader2 size={32} className="text-nexus-accent animate-spin mb-2" /> : <Folder size={32} className="text-nexus-muted mb-2" />}
+                      <p className="font-medium text-nexus-text">Select Folder (Desktop)</p>
+                    </div>
+
+                    {/* Mobile File Batch Selection (Fallback) */}
+                    <div 
+                      onClick={() => !isProcessing && mobileFilesInputRef.current?.click()}
+                      className={`border border-slate-200 rounded-xl p-4 flex items-center justify-center gap-3 cursor-pointer hover:bg-slate-50 transition-colors ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                         <input 
+                            type="file" 
+                            ref={mobileFilesInputRef} 
+                            className="hidden" 
+                            onChange={handleFolderChange} 
+                            multiple
+                          />
+                         <Smartphone size={20} className="text-nexus-muted" />
+                         <span className="text-sm font-medium text-nexus-text">Select Files (Mobile)</span>
+                    </div>
                 </div>
              )}
 
