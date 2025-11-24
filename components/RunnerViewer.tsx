@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { getProject, updateProject, addLog, getProjectLogs, clearProjectLogs } from '../services/storageService';
+import { getProject, updateProject, addLog, getProjectLogs } from '../services/storageService';
 import { prepareHtmlForExecution } from '../services/zipService';
 import { Project, APP_CONFIG, LogEntry } from '../types';
-import { X, ExternalLink, RefreshCw, Smartphone, Monitor, ShieldAlert, Bug, Settings as SettingsIcon, Save, Trash2, Globe, Activity, Loader2, Maximize, Minimize } from 'lucide-react';
+import { X, RefreshCw, Bug, Settings as SettingsIcon, Minimize2, LogOut, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -11,20 +11,18 @@ interface RunnerViewerProps {
   projectId: string;
   project?: Project;
   onClose: () => void;
+  onToggleImmersive: (isImmersive: boolean) => void;
 }
 
-type ViewMode = 'mobile' | 'expanded' | 'fullscreen';
+type ViewMode = 'mobile' | 'expanded';
 
-const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initialProject, onClose }) => {
+const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initialProject, onClose, onToggleImmersive }) => {
   const [project, setProject] = useState<Project | null>(initialProject || null);
   const [srcDoc, setSrcDoc] = useState<string>('');
-  
-  // View State
   const [viewMode, setViewMode] = useState<ViewMode>('mobile');
-  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false);
-
+  const [isImmersiveMode, setIsImmersiveMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [statusMessage, setStatusMessage] = useState('Booting environment...');
+  const [statusMessage, setStatusMessage] = useState('MOUNTING TAPE...');
   const [isBlockedUrl, setIsBlockedUrl] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
@@ -33,60 +31,46 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
   const containerRef = useRef<HTMLDivElement>(null);
   const [tempApiKey, setTempApiKey] = useState('');
 
-  // Initial Load & Settings
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
-      setStatusMessage('Loading project files...');
-
-      // 1. Check Global Preference for View Mode
+      setStatusMessage('READING DATA...');
       const storedMode = localStorage.getItem('nexus_runner_default_mode') as ViewMode;
       const isMobileDevice = window.innerWidth < 768;
-      
-      // On actual mobile devices, default to 'expanded' (full width) to avoid double-boxing
       if (isMobileDevice) {
           setViewMode('expanded');
       } else if (storedMode) {
           setViewMode(storedMode);
       }
-
       try {
         let p = project;
-        
-        // Force DB fetch if files are missing
         if (!p || !p.files || Object.keys(p.files).length === 0) {
             const fullProject = await getProject(projectId);
             if (fullProject) {
                 p = fullProject;
                 setProject(p);
             } else {
-                throw new Error("Project data missing");
+                throw new Error("Data Corruption");
             }
         }
-        
         setTempApiKey(p.settings?.apiKey || '');
-
         const history = await getProjectLogs(p.id);
         setLogs(history.sort((a, b) => a.timestamp - b.timestamp));
-
         if (p.type === 'external_url' && p.externalUrl) {
             const urlObj = new URL(p.externalUrl);
-            if (APP_CONFIG.blockedHosts.some(host => urlObj.hostname.includes(host))) {
-                setIsBlockedUrl(true);
-            }
+            if (APP_CONFIG.blockedHosts.some(host => urlObj.hostname.includes(host))) setIsBlockedUrl(true);
         } else if (p.type === 'web') {
-            setStatusMessage('Transpiling code...');
+            setStatusMessage('EXECUTING...');
             setTimeout(async () => {
                 const globalKey = localStorage.getItem('nexus_global_api_key') || undefined;
                 const html = await prepareHtmlForExecution(p!, globalKey);
                 setSrcDoc(html);
                 setIsLoading(false);
-            }, 100);
+            }, 300);
             return;
         }
       } catch (e) {
-        console.error("Runner load error:", e);
-        setStatusMessage('Error loading project');
+        setStatusMessage('READ ERROR.');
       } finally {
         if (project?.type === 'external_url') setIsLoading(false);
       }
@@ -94,36 +78,10 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
     load();
   }, [projectId]);
 
-  // Handle Fullscreen Toggle
-  const toggleNativeFullscreen = () => {
-      if (!document.fullscreenElement) {
-          containerRef.current?.requestFullscreen().catch(err => console.error(err));
-          setIsNativeFullscreen(true);
-          setViewMode('expanded'); // Force expand in fullscreen
-      } else {
-          document.exitFullscreen();
-          setIsNativeFullscreen(false);
-      }
-  };
-
-  // Sync Fullscreen State listener
-  useEffect(() => {
-      const handler = () => setIsNativeFullscreen(!!document.fullscreenElement);
-      document.addEventListener('fullscreenchange', handler);
-      return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
-
-  // Message Listener for Logs
   useEffect(() => {
       const handleMessage = async (event: MessageEvent) => {
           if (event.data?.type === 'NEXUS_LOG' && project) {
-              const newLog: LogEntry = {
-                  id: uuidv4(),
-                  projectId: project.id,
-                  timestamp: event.data.payload.timestamp || Date.now(),
-                  type: event.data.payload.type || 'info',
-                  message: event.data.payload.message || ''
-              };
+              const newLog: LogEntry = { id: uuidv4(), projectId: project.id, timestamp: Date.now(), type: event.data.payload.type || 'info', message: event.data.payload.message || '' };
               setLogs(prev => [...prev, newLog]);
               await addLog(newLog);
           }
@@ -133,85 +91,73 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
   }, [project]);
 
   const handleOpenExternal = () => {
-      if (project?.externalUrl) {
-          window.open(project.externalUrl, '_blank');
-      }
+      if (project?.externalUrl) window.open(project.externalUrl, '_blank');
   };
 
   const handleRefresh = async () => {
       if (iframeRef.current) {
+          setIsLoading(true);
+          setStatusMessage('REWINDING...');
           if (project?.type === 'external_url') {
               const currentSrc = iframeRef.current.src;
               iframeRef.current.src = '';
-              setTimeout(() => { if(iframeRef.current) iframeRef.current.src = currentSrc; }, 10);
+              setTimeout(() => { if(iframeRef.current) iframeRef.current.src = currentSrc; setIsLoading(false); }, 500);
           } else if (project) {
-              setIsLoading(true);
-              setStatusMessage('Recompiling...');
               setTimeout(async () => {
                   const globalKey = localStorage.getItem('nexus_global_api_key') || undefined;
                   const html = await prepareHtmlForExecution(project, globalKey);
                   setSrcDoc(html);
                   setIsLoading(false);
-              }, 50);
+              }, 500);
           }
       }
   };
 
-  const handleClearLogs = async () => {
-      if (project) {
-          await clearProjectLogs(project.id);
-          setLogs([]);
-      }
+  const handleExitImmersive = () => {
+      setIsImmersiveMode(false);
+      onToggleImmersive(false);
+      if (document.fullscreenElement) document.exitFullscreen().catch(e => console.error(e));
   };
 
   const saveSettings = async () => {
       if (!project) return;
-      
-      // Save View Preference if changed
-      localStorage.setItem('nexus_runner_default_mode', viewMode === 'fullscreen' ? 'expanded' : viewMode);
-
-      const updatedProject = {
-          ...project,
-          settings: {
-              ...project.settings,
-              apiKey: tempApiKey
-          }
-      };
+      localStorage.setItem('nexus_runner_default_mode', viewMode);
+      const updatedProject = { ...project, settings: { ...project.settings, apiKey: tempApiKey } };
       await updateProject(updatedProject);
       setProject(updatedProject);
       setIsSettingsOpen(false);
       handleRefresh();
+      if (isImmersiveMode) {
+          onToggleImmersive(true);
+          setViewMode('expanded');
+          containerRef.current?.requestFullscreen().catch(e => console.error(e));
+      }
   };
 
   if (isLoading) {
       return (
-          <div className="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center animate-fade-in">
-             <div className="relative mb-6">
-                <Loader2 className="h-12 w-12 text-nexus-accent animate-spin" />
+          <div className="absolute inset-0 bg-cassette-dark z-50 flex flex-col items-center justify-center animate-fade-in font-mono">
+             <div className="text-cassette-accent font-industrial text-2xl mb-4 tracking-widest">{statusMessage}</div>
+             <div className="w-64 h-4 bg-black border border-cassette-plastic rounded-full overflow-hidden">
+                 <div className="h-full bg-cassette-accent animate-[width_2s_ease-in-out_infinite] w-1/2"></div>
              </div>
-             <p className="text-nexus-text text-lg font-bold">{statusMessage}</p>
           </div>
       );
   }
 
-  // Fallback for Blocked Sites
   if (isBlockedUrl) {
       return (
-        <div className="absolute inset-0 z-50 bg-slate-50 flex flex-col">
+        <div className="absolute inset-0 z-50 bg-cassette-dark flex flex-col font-mono text-white">
             <RunnerHeader title={project?.name} onClose={onClose} logCount={0} />
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-fade-in relative overflow-hidden">
-                <div className="bg-white p-10 rounded-3xl border border-slate-200 shadow-xl max-w-md w-full relative z-10">
-                    <ShieldAlert size={40} className="text-yellow-500 mx-auto mb-6" />
-                    <h2 className="text-2xl font-bold text-nexus-text mb-3">External Link Required</h2>
-                    <p className="text-nexus-muted mb-8 leading-relaxed">
-                        To protect your security, <strong>{new URL(project!.externalUrl!).hostname}</strong> cannot be embedded.
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+                <div className="bg-cassette-plastic p-10 rounded-sm shadow-xl max-w-md w-full border-2 border-red-900/50">
+                    <ShieldAlert size={48} className="text-red-500 mx-auto mb-4" />
+                    <h2 className="text-2xl font-industrial mb-2 text-white">PROTOCOL ERROR</h2>
+                    <p className="text-gray-400 mb-6 text-sm font-mono">
+                        Target domain ({new URL(project!.externalUrl!).hostname}) rejects embedded connection.
                     </p>
-                    <button 
-                        onClick={handleOpenExternal}
-                        className="w-full bg-nexus-accent hover:bg-blue-600 text-white px-6 py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-all"
-                    >
-                        <span>Open in Browser</span>
-                        <ExternalLink size={20} />
+                    <button onClick={handleOpenExternal} className="w-full bg-cassette-accent text-black rounded-sm px-6 py-3 font-bold hover:bg-white transition-colors uppercase tracking-widest">
+                        Launch Externally
                     </button>
                 </div>
             </div>
@@ -220,27 +166,25 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
   }
 
   return (
-    <div ref={containerRef} className="absolute inset-0 z-50 bg-nexus-dark flex flex-col animate-fade-in">
-        <RunnerHeader 
-            title={project?.name} 
-            onClose={onClose} 
-            showViewToggle={project?.type !== 'external_url'} 
-            viewMode={viewMode} 
-            onRefresh={handleRefresh}
-            onToggleConsole={() => setIsConsoleOpen(!isConsoleOpen)}
-            onToggleSettings={() => setIsSettingsOpen(true)}
-            onToggleFullscreen={toggleNativeFullscreen}
-            isNativeFullscreen={isNativeFullscreen}
-            logCount={logs.length}
-        />
+    <div ref={containerRef} className="absolute inset-0 z-50 bg-cassette-dark flex flex-col animate-fade-in font-mono text-gray-200">
+        {!isImmersiveMode && (
+            <RunnerHeader 
+                title={project?.name} 
+                onClose={onClose} 
+                showViewToggle={project?.type !== 'external_url'} 
+                viewMode={viewMode} 
+                onRefresh={handleRefresh}
+                onToggleConsole={() => setIsConsoleOpen(!isConsoleOpen)}
+                onToggleSettings={() => setIsSettingsOpen(true)}
+                logCount={logs.length}
+            />
+        )}
         
-        <div className="flex-1 relative flex flex-col items-center justify-center bg-slate-200 overflow-hidden">
-            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
-
-            <div className={`transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] relative bg-white overflow-hidden shadow-2xl flex-shrink-0 origin-center ${
-                viewMode === 'mobile' && !isNativeFullscreen
-                ? 'w-[375px] h-[667px] rounded-[36px] border-[8px] border-[#1e293b] ring-1 ring-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.3)]' 
-                : 'w-full h-full rounded-none border-none'
+        <div className="flex-1 relative flex flex-col items-center justify-center bg-[#111] overflow-hidden bg-noise shadow-bezel">
+            <div className={`transition-all duration-300 relative overflow-hidden flex-shrink-0 origin-center ${
+                viewMode === 'mobile' && !isImmersiveMode
+                ? 'w-[375px] h-[667px] border-[12px] border-[#252830] rounded-lg shadow-2xl' 
+                : 'w-full h-full border-none'
             }`}>
                 <iframe
                     ref={iframeRef}
@@ -254,80 +198,47 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
             </div>
         </div>
 
-        {/* Console Panel */}
-        {isConsoleOpen && (
-            <div className="h-1/3 min-h-[250px] bg-[#1e293b] border-t border-slate-700 flex flex-col animate-slide-up absolute bottom-0 w-full z-20 shadow-2xl">
-                <div className="flex items-center justify-between px-4 py-2 bg-[#0f172a] border-b border-slate-700">
-                    <div className="flex items-center gap-3">
-                        <Bug size={18} className="text-white" />
-                        <span className="text-sm font-bold text-white uppercase tracking-wider">Console</span>
-                        <span className="bg-nexus-accent text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{logs.length}</span>
-                    </div>
-                    <div className="flex gap-2">
-                        <button onClick={handleClearLogs} className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-400 px-3 py-1.5 hover:bg-white/5 rounded-lg transition-colors">
-                            <Trash2 size={14} /> Clear
-                        </button>
-                        <button onClick={() => setIsConsoleOpen(false)} className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg">
-                            <X size={16} />
-                        </button>
-                    </div>
+        {isImmersiveMode && (
+            <button onClick={handleExitImmersive} className="absolute bottom-6 right-6 z-50 bg-cassette-accent/80 hover:bg-white text-black p-3 rounded-sm backdrop-blur-md transition-all shadow-[0_0_15px_rgba(255,153,0,0.6)]">
+                <Minimize2 size={24} />
+            </button>
+        )}
+
+        {isConsoleOpen && !isImmersiveMode && (
+            <div className="h-1/3 min-h-[250px] bg-black border-t-4 border-cassette-plastic flex flex-col animate-slide-up absolute bottom-0 w-full z-20 shadow-2xl font-mono text-xs">
+                <div className="flex items-center justify-between px-4 py-1 bg-cassette-plastic text-white border-b border-white/10">
+                    <span className="font-bold uppercase tracking-wider text-cassette-accent">DEBUG_LOG_OUTPUT</span>
+                    <button onClick={() => setIsConsoleOpen(false)}><X size={14} className="text-gray-400 hover:text-white" /></button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-1.5 scroll-smooth text-slate-300">
-                     {/* Logs rendering... */}
-                     {logs.length === 0 ? <div className="text-center text-slate-600 mt-10">No logs</div> : logs.map(l => (
-                        <div key={l.id} className={clsx("p-1", l.type === 'error' ? 'text-red-400' : 'text-slate-300')}>{l.message}</div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-1 text-cassette-highlight/80">
+                     {logs.map(l => (
+                        <div key={l.id} className={clsx("p-1 border-b border-white/5", l.type === 'error' ? 'text-red-500' : 'text-green-400')}>
+                            <span className="opacity-50 mr-2">[{new Date(l.timestamp).toLocaleTimeString()}]</span>
+                            {l.message}
+                        </div>
                      ))}
                 </div>
             </div>
         )}
 
-        {/* Settings Modal */}
         {isSettingsOpen && (
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-30 flex items-center justify-center p-6 animate-fade-in">
-                <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-slide-up border border-slate-200">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold text-nexus-text">Configuration</h3>
-                        <button onClick={() => setIsSettingsOpen(false)}><X size={20} className="text-nexus-muted" /></button>
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-sm z-30 flex items-center justify-center p-6 animate-fade-in">
+                <div className="bg-cassette-plastic w-full max-w-sm p-6 rounded-sm shadow-2xl border border-cassette-accent">
+                    <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-2">
+                        <h3 className="text-lg font-industrial text-white uppercase tracking-wide">SYS_CONFIG</h3>
+                        <button onClick={() => setIsSettingsOpen(false)}><X size={20} className="text-gray-400 hover:text-white" /></button>
                     </div>
                     <div className="space-y-5">
-                        {/* View Mode Settings */}
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-nexus-muted mb-3">Screen Mode</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button 
-                                    onClick={() => setViewMode('mobile')} 
-                                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${viewMode === 'mobile' ? 'border-nexus-accent bg-blue-50 text-nexus-accent' : 'border-slate-200 hover:bg-slate-50 text-nexus-muted'}`}
-                                >
-                                    <Smartphone size={20} />
-                                    <span className="text-xs font-bold">Mobile Sim</span>
-                                </button>
-                                <button 
-                                    onClick={() => setViewMode('expanded')} 
-                                    className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${viewMode === 'expanded' ? 'border-nexus-accent bg-blue-50 text-nexus-accent' : 'border-slate-200 hover:bg-slate-50 text-nexus-muted'}`}
-                                >
-                                    <Monitor size={20} />
-                                    <span className="text-xs font-bold">Expanded</span>
-                                </button>
-                            </div>
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                            <button onClick={() => setViewMode('mobile')} className={`p-3 border rounded-sm text-xs font-bold uppercase ${viewMode === 'mobile' ? 'bg-cassette-accent text-black border-transparent' : 'border-white/20 text-gray-400 hover:text-white'}`}>Mobile</button>
+                            <button onClick={() => setViewMode('expanded')} className={`p-3 border rounded-sm text-xs font-bold uppercase ${viewMode === 'expanded' ? 'bg-cassette-accent text-black border-transparent' : 'border-white/20 text-gray-400 hover:text-white'}`}>Wide</button>
                         </div>
-
-                        <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-nexus-muted mb-2">API Key</label>
-                            <input 
-                                type="password" 
-                                value={tempApiKey}
-                                onChange={(e) => setTempApiKey(e.target.value)}
-                                placeholder="Inherit from Global Settings"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-nexus-accent"
-                            />
-                        </div>
-
-                        <button 
-                            onClick={saveSettings}
-                            className="w-full bg-nexus-accent hover:bg-blue-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-nexus-accent/20"
-                        >
-                            <Save size={18} /> Apply & Reload
+                        <button onClick={() => setIsImmersiveMode(!isImmersiveMode)} className={`w-full p-3 border rounded-sm font-bold text-xs uppercase flex justify-between items-center ${isImmersiveMode ? 'bg-cassette-highlight text-black border-transparent' : 'border-white/20 text-gray-400 hover:text-white'}`}>
+                            <span>Immersive Mode</span>
+                            <div className={`w-3 h-3 rounded-full border border-current ${isImmersiveMode ? 'bg-black border-transparent' : 'bg-transparent'}`}></div>
                         </button>
+                        <input type="password" value={tempApiKey} onChange={(e) => setTempApiKey(e.target.value)} placeholder="OVERRIDE_API_KEY" className="w-full bg-black border border-white/20 p-2 text-xs text-cassette-highlight rounded-sm outline-none focus:border-cassette-accent" />
+                        <button onClick={saveSettings} className="w-full bg-white text-black font-bold py-3 rounded-sm shadow-md hover:bg-gray-200 transition-all uppercase tracking-widest">Execute</button>
                     </div>
                 </div>
             </div>
@@ -336,46 +247,34 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
   );
 };
 
-const RunnerHeader = ({ 
-    title, onClose, showViewToggle, viewMode, onRefresh, onToggleConsole, onToggleSettings, onToggleFullscreen, isNativeFullscreen, logCount
-}: any) => (
-    <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-nexus-border z-10 shrink-0 shadow-sm h-14">
-        <div className="flex items-center gap-3 overflow-hidden">
-            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-nexus-muted hover:text-nexus-text">
-                <X size={20} />
+const RunnerHeader = ({ title, onClose, showViewToggle, viewMode, onRefresh, onToggleConsole, onToggleSettings, logCount }: any) => (
+    <div className="flex items-center justify-between px-4 py-2 bg-cassette-plastic border-b-4 border-black z-10 shrink-0 h-16 shadow-lg">
+        <div className="flex items-center gap-4">
+            <button 
+                onClick={onClose} 
+                className="group flex flex-col items-center justify-center bg-black border border-white/10 hover:border-red-500 w-12 h-10 rounded-sm transition-all active:scale-95"
+                title="EJECT TAPE"
+            >
+                <LogOut size={16} className="text-gray-500 group-hover:text-red-500 mb-[2px]" />
+                <span className="text-[8px] text-gray-600 font-bold">EJECT</span>
             </button>
-            <div className="flex flex-col">
-                <h1 className="font-bold text-nexus-text text-sm truncate max-w-[120px] sm:max-w-xs">{title || 'Runner'}</h1>
-                <span className="text-[10px] text-green-600 flex items-center gap-1 uppercase tracking-wider font-bold">
-                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-                    Running
-                </span>
+            
+            <div className="flex flex-col border-l border-white/10 pl-4">
+                <h1 className="font-industrial text-white text-xl tracking-wider uppercase leading-none max-w-[200px] truncate">{title || 'UNKNOWN'}</h1>
+                <div className="flex gap-2 items-center">
+                    <div className="w-2 h-2 rounded-full bg-cassette-accent animate-pulse"></div>
+                    <span className="text-[10px] text-cassette-accent font-mono uppercase tracking-widest">PLAYING</span>
+                </div>
             </div>
         </div>
         
         <div className="flex items-center gap-2">
-            {showViewToggle && (
-                <button 
-                    onClick={onToggleFullscreen} 
-                    className={`hidden sm:flex p-2 rounded-lg transition-colors ${isNativeFullscreen ? 'text-nexus-accent bg-blue-50' : 'text-nexus-muted hover:bg-slate-100'}`}
-                    title="Toggle Fullscreen"
-                >
-                    {isNativeFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-                </button>
-            )}
-
-            <button onClick={onToggleConsole} className={clsx(
-                "relative p-2 rounded-lg transition-all",
-                logCount > 0 ? "text-nexus-accent bg-blue-50" : "text-nexus-muted hover:text-nexus-text hover:bg-slate-100"
-            )}>
-                <Bug size={18} />
+            <button onClick={onToggleConsole} className={clsx("p-2 rounded hover:bg-white/10 transition-colors relative", logCount > 0 ? "text-cassette-highlight" : "text-gray-400")}>
+                <Bug size={20} />
+                {logCount > 0 && <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>}
             </button>
-            <button onClick={onToggleSettings} className="p-2 text-nexus-muted hover:text-nexus-text hover:bg-slate-100 rounded-lg">
-                <SettingsIcon size={18} />
-            </button>
-            <button onClick={onRefresh} className="p-2 text-nexus-muted hover:text-nexus-text hover:bg-slate-100 rounded-lg active:rotate-180 duration-500">
-                <RefreshCw size={18} />
-            </button>
+            <button onClick={onToggleSettings} className="p-2 text-gray-400 hover:bg-white/10 hover:text-white rounded transition-colors"><SettingsIcon size={20} /></button>
+            <button onClick={onRefresh} className="p-2 text-gray-400 hover:bg-white/10 hover:text-white rounded transition-colors"><RefreshCw size={20} /></button>
         </div>
     </div>
 );

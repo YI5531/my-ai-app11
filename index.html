@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -15,58 +16,83 @@
       })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Babel Config to handle experimental syntax gracefully if leaked -->
+    <script>
+      window.Babel = window.Babel || {};
+      window.Babel.availablePlugins = window.Babel.availablePlugins || {};
+      // This helps suppress some transpilation noise if angular files are present
+    </script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Import Fonts: Russo One (Industrial), Share Tech Mono (Data), Permanent Marker (Handwriting) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Ma+Shan+Zheng&family=Permanent+Marker&family=Russo+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
     <script>
       tailwind.config = {
         theme: {
           extend: {
+            fontFamily: {
+              sans: ['"Inter"', 'sans-serif'],
+              industrial: ['"Russo One"', 'sans-serif'],
+              mono: ['"Share Tech Mono"', 'monospace'],
+              marker: ['"Permanent Marker"', '"Ma Shan Zheng"', 'cursive'],
+            },
             colors: {
-              nexus: {
-                dark: '#f8fafc',    /* Main Background (Light Slate) */
-                card: '#ffffff',    /* Card Surface (White) */
-                accent: '#2563eb',  /* Blue 600 */
-                success: '#10b981',
-                text: '#1e293b',    /* Slate 800 */
-                muted: '#64748b',   /* Slate 500 */
-                border: '#e2e8f0'   /* Slate 200 */
+              cassette: {
+                base: '#1a1c21',       // Deep Gunmetal
+                plastic: '#252830',    // Lighter Plastic
+                label: '#f0f0f0',      // Paper White
+                accent: '#ff9900',     // Safety Orange
+                highlight: '#00e5ff',  // Cyber Blue
+                dark: '#111111',       // Void
+                text: '#e0e0e0',
+                muted: '#666666',
               }
             },
-            animation: {
-              'fade-in': 'fadeIn 0.3s ease-out',
-              'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+            backgroundImage: {
+              'noise': "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.07%22/%3E%3C/svg%3E')",
+              'stripes': "repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.2) 10px, rgba(0,0,0,0.2) 20px)",
+              'grip': "repeating-linear-gradient(90deg, #1a1a1a, #1a1a1a 2px, #2a2a2a 2px, #2a2a2a 4px)",
             },
-            keyframes: {
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              },
-              slideUp: {
-                '0%': { transform: 'translateY(20px)', opacity: '0' },
-                '100%': { transform: 'translateY(0)', opacity: '1' },
-              }
+            boxShadow: {
+              'plastic': 'inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 8px rgba(0,0,0,0.5)',
+              'bezel': 'inset 0 0 20px rgba(0,0,0,0.8)',
             }
           },
         },
       }
     </script>
     <style>
-      .no-scrollbar::-webkit-scrollbar { display: none; }
-      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      body { background-color: #f8fafc; color: #1e293b; -webkit-tap-highlight-color: transparent; margin: 0; height: 100vh; overflow: hidden; }
-      #root { height: 100%; display: flex; flex-direction: column; }
+      body { 
+        background-color: #111; 
+        color: #e0e0e0; 
+        font-family: 'Share Tech Mono', monospace;
+        -webkit-tap-highlight-color: transparent; 
+        margin: 0; 
+        height: 100vh; 
+        overflow: hidden;
+      }
       
-      /* Loading State Styles */
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar-track { background: #111; }
+      ::-webkit-scrollbar-thumb { background: #333; border: 2px solid #111; border-radius: 0; }
+      ::-webkit-scrollbar-thumb:hover { background: #ff9900; }
+
+      /* Loading State */
       #app-loading {
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background: #ffffff; z-index: 9999; transition: opacity 0.5s;
+        background: #111; z-index: 9998;
       }
-      .loading-spinner {
-        width: 40px; height: 40px; border: 3px solid rgba(37, 99, 235, 0.1);
-        border-radius: 50%; border-top-color: #2563eb;
-        animation: spin 0.8s ease-in-out infinite;
+      .loader-ring {
+        width: 60px; height: 60px; border: 4px solid #333; border-top: 4px solid #ff9900; border-radius: 50%;
+        animation: spin 1s linear infinite;
       }
-      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
   <script type="importmap">
 {
@@ -86,28 +112,11 @@
 </head>
   <body>
     <div id="root">
-      <!-- Fallback UI while React loads -->
       <div id="app-loading">
-        <div class="loading-spinner"></div>
-        <p style="margin-top: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; color: #64748b; letter-spacing: 0.5px;">INITIALIZING NEXUS</p>
+        <div class="loader-ring mb-4"></div>
+        <div class="text-cassette-accent font-industrial tracking-widest text-sm">INITIALIZING DECK...</div>
       </div>
     </div>
-    
-    <!-- Global Error Handler -->
-    <script>
-      window.onerror = function(msg, url, line, col, error) {
-        const root = document.getElementById('root');
-        if (root && root.innerHTML.includes('INITIALIZING NEXUS')) {
-          root.innerHTML = `
-            <div style="padding: 40px; color: #ef4444; font-family: sans-serif; background: #ffffff; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
-              <h2 style="font-size: 24px; margin-bottom: 16px; color: #1e293b; font-weight: 700;">System Error</h2>
-              <p style="color: #64748b; margin-bottom: 20px; max-width: 400px;">${msg}</p>
-              <button onclick="window.location.reload()" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;">Reload Application</button>
-            </div>
-          `;
-        }
-      };
-    </script>
   <script type="module" src="/index.tsx"></script>
 </body>
 </html>

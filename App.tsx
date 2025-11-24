@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Project, ProjectMetadata } from './types';
 import { getAllProjects, deleteProject, saveProject } from './services/storageService';
@@ -7,7 +6,7 @@ import RunnerViewer from './components/RunnerViewer';
 import ImportModal from './components/ImportModal';
 import GlobalSettingsModal from './components/GlobalSettingsModal';
 import BrowserView from './components/BrowserView';
-import { Layers, Plus, Settings, Globe, LayoutGrid } from 'lucide-react';
+import { Disc, Globe, Plus, Settings, Gamepad2, Database } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 const App: React.FC = () => {
@@ -17,6 +16,7 @@ const App: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isImmersive, setIsImmersive] = useState(false);
 
   const loadProjects = async () => {
     setIsLoading(true);
@@ -35,22 +35,22 @@ const App: React.FC = () => {
   }, []);
 
   const handleOpenProject = async (meta: ProjectMetadata) => {
-    // Pass metadata to runner, which loads full content
     setActiveProject({ ...meta, files: {} } as Project); 
     setView('runner');
+    setIsImmersive(false);
   };
 
   const handleCloseRunner = () => {
     setView('dashboard');
     setActiveProject(null);
+    setIsImmersive(false);
   };
 
   const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
-    // Crucial: Stop propagation immediately to prevent opening the app
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
     
-    if (confirm('Are you sure you want to delete this app? This action cannot be undone.')) {
+    if (confirm('ERASE TAPE DATA? This action is permanent.')) {
       await deleteProject(id);
       loadProjects();
     }
@@ -62,38 +62,73 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-nexus-dark text-nexus-text font-sans selection:bg-nexus-accent selection:text-white overflow-hidden flex flex-col">
-      {/* Top Bar - Light Theme */}
-      <header className="flex items-center justify-between px-6 py-4 bg-nexus-card border-b border-nexus-border sticky top-0 z-50">
-        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('dashboard')}>
-          <div className="p-2 bg-nexus-accent rounded-lg shadow-md shadow-nexus-accent/20 transition-transform group-hover:scale-105">
-            <Layers size={20} className="text-white" />
+    <div className="min-h-screen bg-cassette-dark text-cassette-text font-mono overflow-hidden flex flex-col bg-noise">
+      {/* Cyber Deck Header */}
+      {!isImmersive && (
+        <header className="h-[70px] bg-cassette-base border-b-4 border-black flex items-center justify-between px-6 shrink-0 z-20 shadow-plastic relative">
+          {/* Stripes Decoration */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-cassette-accent opacity-50 bg-stripes"></div>
+
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('dashboard')}>
+              <div className="bg-cassette-plastic p-2 rounded border border-white/10 group-hover:border-cassette-accent transition-colors">
+                 <Disc size={28} className="text-cassette-accent animate-[spin_10s_linear_infinite]" />
+              </div>
+              <div className="flex flex-col">
+                 <h1 className="text-2xl font-industrial tracking-wider text-white leading-none">NEXUS</h1>
+                 <span className="text-[10px] text-cassette-accent tracking-[0.3em] uppercase">Data Deck 2.0</span>
+              </div>
+            </div>
+            
+            <nav className="flex items-center gap-2 bg-black/30 p-1 rounded">
+              <button 
+                onClick={() => setView('dashboard')}
+                className={`px-6 py-2 rounded-sm text-sm font-bold uppercase transition-all ${
+                  view === 'dashboard' 
+                    ? 'bg-cassette-accent text-black shadow-[0_0_10px_rgba(255,153,0,0.5)]' 
+                    : 'text-cassette-muted hover:text-white hover:bg-white/5'
+                }`}
+              >
+                TAPES
+              </button>
+              <button 
+                onClick={() => setView('browser')}
+                className={`px-6 py-2 rounded-sm text-sm font-bold uppercase transition-all ${
+                  view === 'browser' 
+                    ? 'bg-cassette-highlight text-black shadow-[0_0_10px_rgba(0,229,255,0.5)]' 
+                    : 'text-cassette-muted hover:text-white hover:bg-white/5'
+                }`}
+              >
+                NET
+              </button>
+            </nav>
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-nexus-text">
-            Nexus Runner
-          </h1>
-        </div>
-        
-        {view !== 'runner' && (
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2.5 rounded-full hover:bg-slate-100 text-nexus-muted hover:text-nexus-text transition-colors"
-            >
-              <Settings size={20} />
-            </button>
-            <button 
-              onClick={() => setIsImportOpen(true)}
-              className="p-2.5 rounded-full bg-nexus-accent hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-nexus-accent/20"
-            >
-              <Plus size={20} className="text-white" />
-            </button>
-          </div>
-        )}
-      </header>
+          
+          {view !== 'runner' && (
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setIsImportOpen(true)}
+                className="flex items-center gap-2 border border-cassette-accent text-cassette-accent hover:bg-cassette-accent hover:text-black px-4 py-2 rounded-sm text-xs font-bold tracking-widest transition-all uppercase"
+              >
+                <Plus size={16} strokeWidth={3} />
+                New Tape
+              </button>
+              
+              <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-2 text-cassette-muted hover:text-white hover:bg-white/10 rounded-sm transition-colors"
+                title="System Config"
+              >
+                <Settings size={20} />
+              </button>
+            </div>
+          )}
+        </header>
+      )}
 
       {/* Main Content Area */}
-      <main className="flex-1 relative overflow-hidden flex flex-col bg-nexus-dark">
+      <main className="flex-1 relative overflow-hidden flex flex-col">
+        
         {view === 'dashboard' && (
           <Dashboard 
             projects={projects} 
@@ -111,31 +146,11 @@ const App: React.FC = () => {
           <RunnerViewer 
             projectId={activeProject.id} 
             project={activeProject}
-            onClose={handleCloseRunner} 
+            onClose={handleCloseRunner}
+            onToggleImmersive={setIsImmersive}
           />
         )}
       </main>
-
-      {/* Bottom Nav - Light Theme */}
-      {view !== 'runner' && (
-         <div className="bg-nexus-card border-t border-nexus-border px-6 py-2 flex items-center justify-around pb-6 lg:pb-2 shadow-[0_-5px_15px_rgba(0,0,0,0.02)] z-40">
-            <button 
-               onClick={() => setView('dashboard')}
-               className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-xl transition-all ${view === 'dashboard' ? 'text-nexus-accent bg-blue-50' : 'text-nexus-muted hover:text-nexus-text'}`}
-            >
-               <LayoutGrid size={22} strokeWidth={2.5} />
-               <span className="text-[10px] font-bold uppercase tracking-wide">Apps</span>
-            </button>
-            
-            <button 
-               onClick={() => setView('browser')}
-               className={`flex flex-col items-center gap-1.5 px-6 py-2 rounded-xl transition-all ${view === 'browser' ? 'text-nexus-accent bg-blue-50' : 'text-nexus-muted hover:text-nexus-text'}`}
-            >
-               <Globe size={22} strokeWidth={2.5} />
-               <span className="text-[10px] font-bold uppercase tracking-wide">Browser</span>
-            </button>
-         </div>
-      )}
 
       {/* Modals */}
       {isImportOpen && (

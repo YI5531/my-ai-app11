@@ -1,4 +1,4 @@
-package com.yourname.app;
+package com.nexus.runner;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -1,4 +1,5 @@
 
+
 import JSZip from 'jszip';
 import { Project } from '../types';
 import { v4 as uuidv4 } from 'uuid';
@@ -203,11 +204,17 @@ export async function processFolder(fileList: FileList): Promise<Project> {
     let rootName = 'Imported Folder';
     
     if (fileList.length > 0) {
-        const parts = fileList[0].webkitRelativePath.split('/');
-        if (parts.length > 1) rootName = parts[0];
+        // Try to get root name from relative path if available
+        const firstPath = fileList[0].webkitRelativePath;
+        if (firstPath) {
+             const parts = firstPath.split('/');
+             if (parts.length > 1) rootName = parts[0];
+        }
     }
 
     Array.from(fileList).forEach(file => {
+        // On Mobile/APK, webkitRelativePath might be missing.
+        // Fallback to name (flat structure) if path is missing.
         const path = normalizePath(file.webkitRelativePath || file.name);
         rawFiles[path] = file;
     });

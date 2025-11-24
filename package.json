@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@capacitor/android": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "clsx": "^2.1.1",
     "idb": "^8.0.3",
@@ -20,6 +19,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^7.4.4",
     "@capacitor/cli": "^7.4.4",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
