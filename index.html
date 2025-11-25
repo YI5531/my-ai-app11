@@ -1,9 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <!-- Added viewport-fit=cover for Notch support and disabled user scaling for app-like feel -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Nexus Runner</title>
     <!-- 1. Suppress Warnings IMMEDIATELY -->
     <script>
@@ -66,6 +66,14 @@
       }
     </script>
     <style>
+      :root {
+        /* Safe Area variables for native mobile adaptation */
+        --sat: env(safe-area-inset-top);
+        --sar: env(safe-area-inset-right);
+        --sab: env(safe-area-inset-bottom);
+        --sal: env(safe-area-inset-left);
+      }
+
       body { 
         background-color: #111; 
         color: #e0e0e0; 
@@ -74,12 +82,21 @@
         margin: 0; 
         height: 100vh; 
         overflow: hidden;
+        /* Prevent bounce on iOS */
+        overscroll-behavior-y: none;
+        /* Disable text selection for app-like feel */
+        user-select: none;
+      }
+
+      /* Re-enable selection for inputs */
+      input, textarea {
+        user-select: text;
       }
       
       /* Custom Scrollbar */
-      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar { width: 4px; }
       ::-webkit-scrollbar-track { background: #111; }
-      ::-webkit-scrollbar-thumb { background: #333; border: 2px solid #111; border-radius: 0; }
+      ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
       ::-webkit-scrollbar-thumb:hover { background: #ff9900; }
 
       /* Loading State */
@@ -104,7 +121,9 @@
     "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
     "clsx": "https://aistudiocdn.com/clsx@^2.1.1",
     "jszip": "https://aistudiocdn.com/jszip@^3.10.1",
-    "idb": "https://aistudiocdn.com/idb@^8.0.3"
+    "idb": "https://aistudiocdn.com/idb@^8.0.3",
+    "@capacitor/browser": "https://aistudiocdn.com/@capacitor/browser@^7.0.2",
+    "@capacitor/app": "https://aistudiocdn.com/@capacitor/app@^7.0.0"
   }
 }
 </script>

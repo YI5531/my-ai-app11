@@ -1,9 +1,24 @@
 {
-  "name": "Copy of Nexus Runner",
-  "description": "A universal runtime environment for locally imported web applications, AI Studio builds, and HTML projects. Features secure sandboxing and external link handling.",
+  "name": "Nexus Runner Mobile",
+  "description": "A universal runtime environment for locally imported web applications, AI Studio builds, and HTML projects. Optimized for Capacitor.",
   "requestFramePermissions": [
     "camera",
     "microphone",
-    "geolocation"
+    "geolocation",
+    "midi",
+    "encrypted-media",
+    "autoplay",
+    "fullscreen",
+    "gyroscope",
+    "accelerometer",
+    "magnetometer",
+    "background-sync",
+    "payment"
+  ],
+  "mobilePermissions": [
+    "vibrate",
+    "wake-lock",
+    "network-status",
+    "app-state"
   ]
 }
