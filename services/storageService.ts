@@ -41,11 +41,23 @@ export async function updateProject(project: Project): Promise<void> {
   await db.put('projects', project);
 }
 
+export async function toggleProjectPin(id: string): Promise<void> {
+  const db = await dbPromise;
+  const tx = db.transaction('projects', 'readwrite');
+  const store = tx.objectStore('projects');
+  const project = await store.get(id);
+  if (project) {
+    project.isPinned = !project.isPinned;
+    await store.put(project);
+  }
+  await tx.done;
+}
+
 export async function getAllProjects(): Promise<ProjectMetadata[]> {
   const db = await dbPromise;
   const projects = await db.getAllFromIndex('projects', 'by-date');
-  return projects.map(({ id, name, description, createdAt, type, thumbnail, entryPoint, externalUrl, settings }) => ({
-    id, name, description, createdAt, type, thumbnail, entryPoint, externalUrl, settings
+  return projects.map(({ id, name, description, createdAt, type, thumbnail, entryPoint, externalUrl, settings, isPinned }) => ({
+    id, name, description, createdAt, type, thumbnail, entryPoint, externalUrl, settings, isPinned
   })).reverse();
 }
 

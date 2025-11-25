@@ -1,14 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Project, ProjectMetadata } from './types';
-import { getAllProjects, deleteProject, saveProject } from './services/storageService';
+import { getAllProjects, deleteProject, toggleProjectPin, getProject } from './services/storageService';
 import Dashboard from './components/Dashboard';
 import RunnerViewer from './components/RunnerViewer';
 import ImportModal from './components/ImportModal';
 import GlobalSettingsModal from './components/GlobalSettingsModal';
 import BrowserView from './components/BrowserView';
-import { Disc, Globe, Plus, Settings, Gamepad2, Database } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import { Disc, Plus, Settings } from 'lucide-react';
 import { App as CapacitorApp, URLOpenListenerEvent } from '@capacitor/app';
+import { registerPlugin } from '@capacitor/core';
+
+// Manual definition of the plugin interface to avoid import errors
+interface PinnedShortcutsPlugin {
+  pin(options: {
+    id: string;
+    shortLabel: string;
+    longLabel: string;
+    icon: string;
+    intent: string;
+  }): Promise<void>;
+}
+
+// Safely register the plugin. If native implementation is missing (web), it will just not work, but won't crash the app on load.
+const PinnedShortcuts = registerPlugin<PinnedShortcutsPlugin>('PinnedShortcuts');
 
 const App: React.FC = () => {
   const [view, setView] = useState<'dashboard' | 'runner' | 'browser'>('dashboard');
@@ -33,6 +47,36 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadProjects();
+  }, []);
+
+  // Handle Deep Links (Shortcuts)
+  // This listener is required for the shortcuts to actually open the specific game/project
+  useEffect(() => {
+    const handleUrlOpen = async (event: URLOpenListenerEvent) => {
+        try {
+            // nexus://run?id=...
+            const urlObj = new URL(event.url);
+            // Check for scheme
+            if (event.url.startsWith('nexus://run') || (urlObj.protocol.includes('nexus') && urlObj.host === 'run')) {
+                const id = urlObj.searchParams.get('id');
+                if (id) {
+                    const project = await getProject(id);
+                    if (project) {
+                        setActiveProject(project);
+                        setView('runner');
+                    }
+                }
+            }
+        } catch(e) {
+            console.error('Deep Link Error', e);
+        }
+    };
+
+    CapacitorApp.addListener('appUrlOpen', handleUrlOpen);
+
+    return () => {
+        CapacitorApp.removeAllListeners();
+    };
   }, []);
 
   // Hardware Back Button Handler (Android)
@@ -72,45 +116,6 @@ const App: React.FC = () => {
     };
   }, [view, isImmersive, isImportOpen, isSettingsOpen]);
 
-  // Deep Link / Shortcut Handler
-  useEffect(() => {
-    // 1. Handle Cold Start (App launched from scratch via URL)
-    if (!isLoading && projects.length > 0) {
-        const checkUrl = (urlStr: string) => {
-            try {
-                const url = new URL(urlStr);
-                // Support both ?id=... and ?project_id=...
-                const targetId = url.searchParams.get('id') || url.searchParams.get('project_id');
-                
-                if (targetId) {
-                    const target = projects.find(p => p.id === targetId);
-                    if (target) {
-                        console.log("Deep link activated:", target.name);
-                        handleOpenProject(target);
-                        setIsImmersive(true);
-                    }
-                }
-            } catch (e) {
-                console.warn("Invalid Deep Link URL", urlStr);
-            }
-        };
-
-        // Check current URL immediately
-        checkUrl(window.location.href);
-
-        // 2. Handle Warm Start (App resumed from background)
-        // This is critical for Android Shortcuts when app is already open
-        const listener = CapacitorApp.addListener('appUrlOpen', (data: URLOpenListenerEvent) => {
-            console.log('App opened with URL:', data.url);
-            checkUrl(data.url);
-        });
-
-        return () => {
-            listener.then(handle => handle.remove());
-        };
-    }
-  }, [isLoading, projects]);
-
   const handleOpenProject = async (meta: ProjectMetadata) => {
     setActiveProject({ ...meta, files: {} } as Project); 
     setView('runner');
@@ -121,11 +126,6 @@ const App: React.FC = () => {
     setView('dashboard');
     setActiveProject(null);
     setIsImmersive(false);
-    
-    // Clear URL params on close to prevent loop on refresh
-    const url = new URL(window.location.href);
-    url.search = '';
-    window.history.replaceState({}, '', url.toString());
   };
 
   const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
@@ -138,6 +138,35 @@ const App: React.FC = () => {
     if (confirm('ERASE TAPE DATA? This action is permanent.')) {
       await deleteProject(id);
       loadProjects();
+    }
+  };
+
+  const handleTogglePin = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    if (navigator.vibrate) navigator.vibrate(20);
+    
+    await toggleProjectPin(id);
+    loadProjects();
+  };
+
+  const handleAddToHome = async (project: ProjectMetadata, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (navigator.vibrate) navigator.vibrate(20);
+
+    try {
+        await PinnedShortcuts.pin({
+          id: `shortcut_${project.id}`,
+          shortLabel: project.name,
+          longLabel: project.name,
+          icon: 'ic_launcher', // Assumes 'ic_launcher' exists in the Android res/drawable folder
+          intent: `nexus://run?id=${project.id}`
+        });
+        alert('Shortcut Request Sent! Please confirm in system dialog.');
+    } catch (e) {
+        console.error("Failed to pin shortcut", e);
+        // Fallback or error message for web/unsupported environments
+        alert('This feature requires the Native App. (Plugin not active)');
     }
   };
 
@@ -224,6 +253,8 @@ const App: React.FC = () => {
             isLoading={isLoading}
             onOpen={handleOpenProject}
             onDelete={handleDeleteProject}
+            onTogglePin={handleTogglePin}
+            onAddToHome={handleAddToHome}
           />
         )}
         

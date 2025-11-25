@@ -31,6 +31,7 @@ export interface ProjectMetadata {
   externalUrl?: string;
   entryPoint?: string;
   settings?: ProjectSettings;
+  isPinned?: boolean;
 }
 
 export interface Project extends ProjectMetadata {

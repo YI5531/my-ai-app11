@@ -26,8 +26,11 @@ jobs:
         with:
           node-version: '20'
 
+      # ⬇️⬇️⬇️ 关键修改在这里！ ⬇️⬇️⬇️
+      # 我们加上了 @capacitor/app (深度链接用) 和 @matthme/capacitor-pinned-shortcuts (快捷方式用)
+      # 这样即使你上传的 package.json 漏了它们，这里也会强制补上
       - name: Install Dependencies
-        run: npm install
+        run: npm install && npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/app @capacitor/browser @matthme/capacitor-pinned-shortcuts
 
       - name: Build Web App
         run: npm run build

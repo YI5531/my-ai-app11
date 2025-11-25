@@ -1,13 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- 1. 必须有的联网权限 (B站音乐需要) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="true">
+        <!-- ⬆️ 重要：usesCleartextTraffic="true" 必须保留，否则 Bilibili 音乐放不出来 -->
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
@@ -17,17 +23,21 @@
             android:launchMode="singleTask"
             android:exported="true">
 
+            <!-- 主图标入口 -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
  
-             <intent-filter>
+            <!-- ⬇️ 必须加回来！这是给快捷方式用的“接收器” -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <!-- 这里的 scheme 必须和你 App.tsx 里写的 'nexus://' 对应 -->
                 <data android:scheme="nexus" />
             </intent-filter>
+            <!-- ⬆️ 如果没有这段，你的桌面快捷方式点击后就是无效的 -->
 
         </activity>
 
@@ -42,7 +52,4 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
 </manifest>
