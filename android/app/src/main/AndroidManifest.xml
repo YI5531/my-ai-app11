@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 1. 必须有的联网权限 (B站音乐需要) -->
+    <!-- ========================================== -->
+    <!-- 基础权限 -->
+    <!-- ========================================== -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- ========================================== -->
+    <!-- 新增：后台播放音乐必须的权限 -->
+    <!-- ========================================== -->
+    <!-- 允许 CPU 在屏幕关闭时继续运行（防止音乐中断） -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 允许前台服务（Android 9+ 必须，用于通知栏控制） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- 针对 Android 14+ 的特殊媒体权限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
         android:allowBackup="true"
@@ -13,7 +25,6 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
-        <!-- ⬆️ 重要：usesCleartextTraffic="true" 必须保留，否则 Bilibili 音乐放不出来 -->
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
@@ -23,22 +34,21 @@
             android:launchMode="singleTask"
             android:exported="true">
 
-            <!-- 主图标入口 -->
+            <!-- 主入口：点击图标启动 -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
  
-            <!-- ⬇️ 必须加回来！这是给快捷方式用的“接收器” -->
+            <!-- ⬇️ 快捷方式入口 (Deep Link) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <!-- 这里的 scheme 必须和你 App.tsx 里写的 'nexus://' 对应 -->
+                <!-- 既支持 nexus://run 也支持 nexus:// 任意路径 -->
                 <data android:scheme="nexus" />
             </intent-filter>
-            <!-- ⬆️ 如果没有这段，你的桌面快捷方式点击后就是无效的 -->
-
+            
         </activity>
 
         <provider

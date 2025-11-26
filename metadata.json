@@ -4,16 +4,7 @@
   "requestFramePermissions": [
     "camera",
     "microphone",
-    "geolocation",
-    "midi",
-    "encrypted-media",
-    "autoplay",
-    "fullscreen",
-    "gyroscope",
-    "accelerometer",
-    "magnetometer",
-    "background-sync",
-    "payment"
+    "geolocation"
   ],
   "mobilePermissions": [
     "vibrate",

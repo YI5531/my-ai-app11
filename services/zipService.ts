@@ -345,7 +345,6 @@ export async function prepareHtmlForExecution(project: Project, globalApiKey?: s
         <meta charset="UTF-8">
         <script>
             // CRITICAL: Synchronous Environment Injection
-            // This ensures process.env is ready BEFORE any module scripts run
             (function() {
                 const k = "${apiKey}";
                 window.API_KEY = k;
@@ -353,18 +352,70 @@ export async function prepareHtmlForExecution(project: Project, globalApiKey?: s
                 window.process.env = window.process.env || {};
                 window.process.env.API_KEY = k;
                 
-                if(!k) {
-                    console.warn("[Nexus] No API Key found in environment. API calls (400) may fail.");
-                } else {
-                    console.log("[Nexus] Environment initialized securely.");
+                // --- NEXUS MEDIA SESSION BRIDGE ---
+                // Bridges the internal iframe MediaSession to the Parent/Native Shell
+                if (window.navigator) {
+                    const originalMediaSession = window.navigator.mediaSession;
+                    
+                    if (!window.navigator.mediaSession) {
+                        window.navigator.mediaSession = {};
+                    }
+
+                    // Proxy 'metadata' setter
+                    let _metadata = null;
+                    Object.defineProperty(window.navigator.mediaSession, 'metadata', {
+                        get: () => _metadata,
+                        set: (val) => {
+                            _metadata = val;
+                            try {
+                                // Serialize metadata and send to parent
+                                const safeMeta = val ? {
+                                    title: val.title,
+                                    artist: val.artist,
+                                    album: val.album,
+                                    artwork: val.artwork ? JSON.parse(JSON.stringify(val.artwork)) : []
+                                } : null;
+                                
+                                window.parent.postMessage({
+                                    type: 'NEXUS_MEDIA_METADATA',
+                                    payload: safeMeta
+                                }, '*');
+                            } catch(e) { console.error('Media Bridge Error', e); }
+                        }
+                    });
+
+                    // Proxy 'setActionHandler'
+                    const _handlers = new Set();
+                    window.navigator.mediaSession.setActionHandler = (action, handler) => {
+                        // Register locally in case browser supports it
+                         if (originalMediaSession && originalMediaSession.setActionHandler) {
+                             originalMediaSession.setActionHandler(action, handler);
+                         }
+
+                        // Register in Nexus Bridge
+                        _handlers.add(action);
+                        window.parent.postMessage({
+                            type: 'NEXUS_MEDIA_REGISTER_HANDLER',
+                            payload: { action }
+                        }, '*');
+
+                        // Store handler to call it when parent sends message back
+                        window._nexusMediaHandlers = window._nexusMediaHandlers || {};
+                        window._nexusMediaHandlers[action] = handler;
+                    };
                 }
 
-                // Suppress Tailwind CDN Warning
-                const _warn = console.warn;
-                console.warn = function(...args) {
-                    if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
-                    _warn.apply(console, args);
-                };
+                // Listener for actions FROM parent (Native Notification -> Parent -> Iframe)
+                window.addEventListener('message', (e) => {
+                    if (e.data && e.data.type === 'NEXUS_MEDIA_ACTION_TRIGGER') {
+                        const action = e.data.payload.action;
+                        if (window._nexusMediaHandlers && window._nexusMediaHandlers[action]) {
+                            console.log('[Nexus] Triggering Media Action:', action);
+                            window._nexusMediaHandlers[action]();
+                        }
+                    }
+                });
+
             })();
 
             // Console Proxy

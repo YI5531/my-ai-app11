@@ -8,7 +8,9 @@ import GlobalSettingsModal from './components/GlobalSettingsModal';
 import BrowserView from './components/BrowserView';
 import { Disc, Plus, Settings } from 'lucide-react';
 import { App as CapacitorApp, URLOpenListenerEvent } from '@capacitor/app';
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
+import clsx from 'clsx';
 
 // Manual definition of the plugin interface to avoid import errors
 interface PinnedShortcutsPlugin {
@@ -21,7 +23,7 @@ interface PinnedShortcutsPlugin {
   }): Promise<void>;
 }
 
-// Safely register the plugin. If native implementation is missing (web), it will just not work, but won't crash the app on load.
+// Safely register the plugin. If native implementation is missing (web), it will just not work.
 const PinnedShortcuts = registerPlugin<PinnedShortcutsPlugin>('PinnedShortcuts');
 
 const App: React.FC = () => {
@@ -49,26 +51,56 @@ const App: React.FC = () => {
     loadProjects();
   }, []);
 
+  // Helper function to open external links based on platform
+  const openExternalLink = async (url: string) => {
+    if (Capacitor.isNativePlatform()) {
+        try {
+            await Browser.open({ 
+                url, 
+                presentationStyle: 'popover', 
+                toolbarColor: '#1a1c21' 
+            });
+        } catch (e) {
+            console.error("Browser Open Failed", e);
+        }
+    } else {
+        console.log('正在尝试打开 Deep Link / External URL:', url);
+        window.open(url, '_blank');
+    }
+  };
+
   // Handle Deep Links (Shortcuts)
-  // This listener is required for the shortcuts to actually open the specific game/project
   useEffect(() => {
     const handleUrlOpen = async (event: URLOpenListenerEvent) => {
-        try {
-            // nexus://run?id=...
-            const urlObj = new URL(event.url);
-            // Check for scheme
-            if (event.url.startsWith('nexus://run') || (urlObj.protocol.includes('nexus') && urlObj.host === 'run')) {
+        console.log('App URL Open:', event.url);
+        
+        // Handle nexus:// scheme for shortcuts
+        if (event.url.startsWith('nexus://')) {
+            try {
+                // Parse the URL: nexus://run?id=xxx
+                // Note: On some Android versions, it might come in as https://... depending on intent filters, 
+                // but the plugin logic usually requests a custom scheme.
+                const urlObj = new URL(event.url);
                 const id = urlObj.searchParams.get('id');
+                
                 if (id) {
                     const project = await getProject(id);
                     if (project) {
                         setActiveProject(project);
                         setView('runner');
+                        // Optional: Auto-enter immersive mode for shortcuts?
+                        // setIsImmersive(true);
+                    } else {
+                        console.warn('Project not found for ID:', id);
                     }
                 }
+            } catch(e) {
+                console.error('Deep Link Parse Error', e);
             }
-        } catch(e) {
-            console.error('Deep Link Error', e);
+        } 
+        // Fallback or other schemes
+        else {
+             openExternalLink(event.url);
         }
     };
 
@@ -96,6 +128,8 @@ const App: React.FC = () => {
 
             if (view === 'runner') {
                 if (isImmersive) {
+                    // Let RunnerViewer handle immersive exit via its own logic if needed,
+                    // or simply toggle state here.
                     setIsImmersive(false);
                 } else {
                     handleCloseRunner();
@@ -156,17 +190,22 @@ const App: React.FC = () => {
 
     try {
         await PinnedShortcuts.pin({
-          id: `shortcut_${project.id}`,
-          shortLabel: project.name,
-          longLabel: project.name,
-          icon: 'ic_launcher', // Assumes 'ic_launcher' exists in the Android res/drawable folder
-          intent: `nexus://run?id=${project.id}`
+          id: `shortcut_${project.id}`, // Unique ID
+          shortLabel: project.name,     // Label under icon
+          longLabel: project.name,      // Long press label
+          icon: 'ic_launcher',          // Android Resource Name (mipmap/drawable)
+          intent: `nexus://run?id=${project.id}` // Deep Link Intent
         });
-        alert('Shortcut Request Sent! Please confirm in system dialog.');
+        alert('请在弹出的系统窗口中确认添加！');
     } catch (e) {
         console.error("Failed to pin shortcut", e);
-        // Fallback or error message for web/unsupported environments
-        alert('This feature requires the Native App. (Plugin not active)');
+        // Fallback logic for web debugging
+        if (!Capacitor.isNativePlatform()) {
+             console.log('Mocking Pin Shortcut on Web:', `nexus://run?id=${project.id}`);
+             alert('Web Dev Mode: Shortcut intent logged to console.');
+        } else {
+             alert('添加失败，可能是权限不足或系统不支持');
+        }
     }
   };
 
@@ -176,7 +215,11 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-cassette-dark text-cassette-text font-mono overflow-hidden flex flex-col bg-noise pb-[env(safe-area-inset-bottom)]">
+    <div className={clsx(
+        "min-h-screen bg-cassette-dark text-cassette-text font-mono overflow-hidden flex flex-col bg-noise",
+        // Only apply safe-area bottom padding if NOT in immersive mode to allow full-screen content
+        isImmersive ? "pb-0" : "pb-[env(safe-area-inset-bottom)]"
+    )}>
       {/* Cyber Deck Header */}
       {!isImmersive && (
         <header className="pt-[env(safe-area-inset-top)] bg-cassette-base border-b-4 border-black flex flex-col shrink-0 z-20 shadow-plastic relative transition-all">
