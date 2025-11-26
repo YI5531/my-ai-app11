@@ -1,21 +1,12 @@
 
-
 import React, { useEffect, useState, useRef } from 'react';
 import { getProject, updateProject, addLog, getProjectLogs } from '../services/storageService';
 import { prepareHtmlForExecution } from '../services/zipService';
 import { Project, APP_CONFIG, LogEntry } from '../types';
-import { X, RefreshCw, Bug, Settings as SettingsIcon, LogOut, ShieldCheck, Smartphone, Monitor, ExternalLink, Globe, Minimize2 } from 'lucide-react';
+import { X, RefreshCw, Bug, Settings as SettingsIcon, LogOut, ShieldCheck, Smartphone, Monitor, ExternalLink, Globe } from 'lucide-react';
 import { Browser } from '@capacitor/browser';
-import { registerPlugin } from '@capacitor/core';
 import clsx from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
-
-// Mock BackgroundMedia interface safely for TypeScript
-interface BackgroundMediaPlugin {
-    // Basic stub if needed
-}
-const BackgroundMedia = registerPlugin<BackgroundMediaPlugin>('BackgroundMedia');
-
 
 interface RunnerViewerProps {
   projectId: string;
@@ -41,10 +32,9 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
   const [tempApiKey, setTempApiKey] = useState('');
   const wakeLockRef = useRef<any>(null);
 
-  // Initialize Background Media and Wake Lock
+  // Request Wake Lock for background Audio/Games
   useEffect(() => {
-    const initSystem = async () => {
-        // 1. Wake Lock
+    const requestWakeLock = async () => {
         if ('wakeLock' in navigator) {
             try {
                 wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
@@ -53,23 +43,15 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
                 console.warn(`Wake Lock Error: ${err}`);
             }
         }
-        
-        // 2. Background Media (Native Plugin Check)
-        try {
-            // Note: The plugin automatically hooks into AudioContext/MediaPlayer on native.
-            // We just need to ensure the import triggers any auto-init if present.
-            // If strictly native code is required, this JS call is a placeholder or config.
-            console.log("Background Media Plugin loaded.");
-        } catch(e) {
-            console.warn("Background Media Plugin not found (Web Mode?)");
-        }
     };
     
-    initSystem();
+    // Call immediately
+    requestWakeLock();
 
+    // Re-acquire lock if visibility changes (app switching)
     const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
-            initSystem();
+            requestWakeLock();
         }
     };
     
@@ -131,47 +113,12 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
     load();
   }, [projectId]);
 
-  // Handle Messages from Iframe (Logs AND Media Session Bridge)
   useEffect(() => {
       const handleMessage = async (event: MessageEvent) => {
-          if (!event.data) return;
-
-          // 1. LOGS
-          if (event.data.type === 'NEXUS_LOG' && project) {
+          if (event.data?.type === 'NEXUS_LOG' && project) {
               const newLog: LogEntry = { id: uuidv4(), projectId: project.id, timestamp: Date.now(), type: event.data.payload.type || 'info', message: event.data.payload.message || '' };
               setLogs(prev => [...prev, newLog]);
               await addLog(newLog);
-          }
-
-          // 2. MEDIA SESSION METADATA (Bridge from Iframe -> System)
-          if (event.data.type === 'NEXUS_MEDIA_METADATA' && navigator.mediaSession) {
-             console.log("[Nexus] Updating System MediaMetadata", event.data.payload);
-             if (event.data.payload) {
-                 // Convert received POJO back to MediaMetadata
-                 navigator.mediaSession.metadata = new MediaMetadata(event.data.payload);
-             } else {
-                 navigator.mediaSession.metadata = null;
-             }
-          }
-
-          // 3. MEDIA SESSION ACTION REGISTRATION (Bridge from Iframe -> System)
-          if (event.data.type === 'NEXUS_MEDIA_REGISTER_HANDLER' && navigator.mediaSession) {
-              const action = event.data.payload.action;
-              console.log("[Nexus] Registering System Media Handler:", action);
-              
-              try {
-                  navigator.mediaSession.setActionHandler(action as any, () => {
-                      // When System Notification is clicked, tell the Iframe
-                      if (iframeRef.current?.contentWindow) {
-                          iframeRef.current.contentWindow.postMessage({
-                              type: 'NEXUS_MEDIA_ACTION_TRIGGER',
-                              payload: { action }
-                          }, '*');
-                      }
-                  });
-              } catch(e) {
-                  console.warn("Failed to set media handler", e);
-              }
           }
       };
       window.addEventListener('message', handleMessage);
@@ -318,15 +265,14 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
         )}
         
         {isImmersiveMode && (
-            // GHOST EXIT BUTTON (Non-blocking, visible on mobile)
-            <div className="fixed bottom-6 right-6 z-[100] touch-manipulation">
-                <button
-                    onClick={handleExitImmersive}
-                    className="bg-black/40 backdrop-blur-md text-white border border-white/20 p-4 rounded-full shadow-lg opacity-30 hover:opacity-100 active:opacity-100 transition-opacity duration-300"
-                    title="Exit Full Screen"
-                >
-                    <Minimize2 size={24} />
-                </button>
+            // Invisible touch area at the very top to exit immersive mode
+            <div 
+                className="absolute top-0 left-0 right-0 h-4 z-[60] flex justify-center items-start pt-1 cursor-pointer group opacity-0 hover:opacity-100 transition-opacity"
+                onClick={handleExitImmersive}
+                onTouchEnd={handleExitImmersive}
+            >
+                {/* Visual indicator only on hover or interaction, otherwise invisible */}
+                 <div className="w-20 h-1 bg-white/30 rounded-full backdrop-blur-md"></div>
             </div>
         )}
         
