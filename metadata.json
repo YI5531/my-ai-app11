@@ -1,0 +1,15 @@
+{
+  "name": "Nexus Runner Mobile",
+  "description": "A universal runtime environment for locally imported web applications, AI Studio builds, and HTML projects. Optimized for Capacitor.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "mobilePermissions": [
+    "vibrate",
+    "wake-lock",
+    "network-status",
+    "app-state"
+  ]
+}

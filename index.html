@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Added viewport-fit=cover for Notch support and disabled user scaling for app-like feel -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Nexus Runner</title>
+    <!-- 1. Suppress Warnings IMMEDIATELY -->
+    <script>
+      (function() {
+        const _warn = console.warn;
+        console.warn = function(...args) {
+          if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+          _warn.apply(console, args);
+        };
+      })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Babel Config to handle experimental syntax gracefully if leaked -->
+    <script>
+      window.Babel = window.Babel || {};
+      window.Babel.availablePlugins = window.Babel.availablePlugins || {};
+      // This helps suppress some transpilation noise if angular files are present
+    </script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Import Fonts: Russo One (Industrial), Share Tech Mono (Data), Permanent Marker (Handwriting) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Ma+Shan+Zheng&family=Permanent+Marker&family=Russo+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Inter"', 'sans-serif'],
+              industrial: ['"Russo One"', 'sans-serif'],
+              mono: ['"Share Tech Mono"', 'monospace'],
+              marker: ['"Permanent Marker"', '"Ma Shan Zheng"', 'cursive'],
+            },
+            colors: {
+              cassette: {
+                base: '#1a1c21',       // Deep Gunmetal
+                plastic: '#252830',    // Lighter Plastic
+                label: '#f0f0f0',      // Paper White
+                accent: '#ff9900',     // Safety Orange
+                highlight: '#00e5ff',  // Cyber Blue
+                dark: '#111111',       // Void
+                text: '#e0e0e0',
+                muted: '#666666',
+              }
+            },
+            backgroundImage: {
+              'noise': "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.07%22/%3E%3C/svg%3E')",
+              'stripes': "repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.2) 10px, rgba(0,0,0,0.2) 20px)",
+              'grip': "repeating-linear-gradient(90deg, #1a1a1a, #1a1a1a 2px, #2a2a2a 2px, #2a2a2a 4px)",
+            },
+            boxShadow: {
+              'plastic': 'inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 8px rgba(0,0,0,0.5)',
+              'bezel': 'inset 0 0 20px rgba(0,0,0,0.8)',
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      :root {
+        /* Safe Area variables for native mobile adaptation */
+        --sat: env(safe-area-inset-top);
+        --sar: env(safe-area-inset-right);
+        --sab: env(safe-area-inset-bottom);
+        --sal: env(safe-area-inset-left);
+      }
+
+      body { 
+        background-color: #111; 
+        color: #e0e0e0; 
+        font-family: 'Share Tech Mono', monospace;
+        -webkit-tap-highlight-color: transparent; 
+        margin: 0; 
+        height: 100vh; 
+        overflow: hidden;
+        /* Prevent bounce on iOS */
+        overscroll-behavior-y: none;
+        /* Disable text selection for app-like feel */
+        user-select: none;
+      }
+
+      /* Re-enable selection for inputs */
+      input, textarea {
+        user-select: text;
+      }
+      
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar { width: 4px; }
+      ::-webkit-scrollbar-track { background: #111; }
+      ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+      ::-webkit-scrollbar-thumb:hover { background: #ff9900; }
+
+      /* Loading State */
+      #app-loading {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: #111; z-index: 9998;
+      }
+      .loader-ring {
+        width: 60px; height: 60px; border: 4px solid #333; border-top: 4px solid #ff9900; border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
+    "clsx": "https://aistudiocdn.com/clsx@^2.1.1",
+    "jszip": "https://aistudiocdn.com/jszip@^3.10.1",
+    "idb": "https://aistudiocdn.com/idb@^8.0.3",
+    "@capacitor/core": "https://aistudiocdn.com/@capacitor/core@^7.0.0",
+    "@capacitor/browser": "https://aistudiocdn.com/@capacitor/browser@^7.0.2",
+    "@capacitor/app": "https://aistudiocdn.com/@capacitor/app@^7.0.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root">
+      <div id="app-loading">
+        <div class="loader-ring mb-4"></div>
+        <div class="text-cassette-accent font-industrial tracking-widest text-sm">INITIALIZING DECK...</div>
+      </div>
+    </div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
