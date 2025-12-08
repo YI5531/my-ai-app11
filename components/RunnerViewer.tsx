@@ -3,10 +3,22 @@ import React, { useEffect, useState, useRef } from 'react';
 import { getProject, updateProject, addLog, getProjectLogs } from '../services/storageService';
 import { prepareHtmlForExecution } from '../services/zipService';
 import { Project, APP_CONFIG, LogEntry } from '../types';
+import { bridgeStorageAPI } from '../services/bridgeStorageService';
 import { X, RefreshCw, Bug, Settings as SettingsIcon, LogOut, ShieldCheck, Smartphone, Monitor, ExternalLink, Globe } from 'lucide-react';
 import { Browser } from '@capacitor/browser';
 import clsx from 'clsx';
 import { v4 as uuidv4 } from 'uuid';
+
+const isBlockedHost = (url?: string): boolean => {
+    if (!url) return false;
+    try {
+        const host = new URL(url).hostname.toLowerCase();
+        return APP_CONFIG.blockedHosts.some(b => host === b || host.endsWith(`.${b}`));
+    } catch (e) {
+        console.warn('URL parse failed for blocklist check', e);
+        return false;
+    }
+};
 
 interface RunnerViewerProps {
   projectId: string;
@@ -27,6 +39,7 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [externalReloadKey, setExternalReloadKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [tempApiKey, setTempApiKey] = useState('');
@@ -97,7 +110,7 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
             setStatusMessage('EXECUTING...');
             setTimeout(async () => {
                 const globalKey = localStorage.getItem('nexus_global_api_key') || undefined;
-                const html = await prepareHtmlForExecution(p!, globalKey);
+                const html = await prepareHtmlForExecution(p!, globalKey, p.id);
                 setSrcDoc(html);
                 setIsLoading(false);
             }, 300);
@@ -119,6 +132,32 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
               const newLog: LogEntry = { id: uuidv4(), projectId: project.id, timestamp: Date.now(), type: event.data.payload.type || 'info', message: event.data.payload.message || '' };
               setLogs(prev => [...prev, newLog]);
               await addLog(newLog);
+          }
+          // Bridge storage API calls from iframe
+          if (event.data?.type === 'NEXUS_STORAGE' && project) {
+              const { action, key, value } = event.data.payload;
+              try {
+                  let result;
+                  if (action === 'set') {
+                      await bridgeStorageAPI.set(project.id, key, value);
+                      result = { success: true };
+                  } else if (action === 'get') {
+                      result = { success: true, value: await bridgeStorageAPI.get(project.id, key) };
+                  } else if (action === 'remove') {
+                      await bridgeStorageAPI.remove(project.id, key);
+                      result = { success: true };
+                  } else if (action === 'clear') {
+                      await bridgeStorageAPI.clear(project.id);
+                      result = { success: true };
+                  } else if (action === 'keys') {
+                      result = { success: true, keys: await bridgeStorageAPI.keys(project.id) };
+                  } else if (action === 'getAll') {
+                      result = { success: true, data: await bridgeStorageAPI.getAll(project.id) };
+                  }
+                  event.source?.postMessage({ type: 'NEXUS_STORAGE_RESPONSE', payload: result }, '*' as any);
+              } catch (e: any) {
+                  event.source?.postMessage({ type: 'NEXUS_STORAGE_RESPONSE', payload: { success: false, error: e.message } }, '*' as any);
+              }
           }
       };
       window.addEventListener('message', handleMessage);
@@ -147,13 +186,17 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
           setStatusMessage('REWINDING...');
           setTimeout(async () => {
               const globalKey = localStorage.getItem('nexus_global_api_key') || undefined;
-              const html = await prepareHtmlForExecution(project, globalKey);
+              const html = await prepareHtmlForExecution(project, globalKey, project.id);
               setSrcDoc(html);
               setIsLoading(false);
           }, 500);
       } else {
-          // Re-launch for external
-          handleLaunchNative();
+          // Inline reload for external links; fallback to native
+          if (project?.externalUrl && !isBlockedHost(project.externalUrl)) {
+              setExternalReloadKey(k => k + 1);
+          } else {
+              handleLaunchNative();
+          }
       }
   };
 
@@ -189,41 +232,54 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
       );
   }
 
-  // --- RENDER EXTERNAL URL LAUNCHER (No Iframe) ---
+  // --- RENDER EXTERNAL URL (INLINE WITH FALLBACK) ---
   if (project?.type === 'external_url') {
+      const blocked = isBlockedHost(project.externalUrl);
       return (
         <div className="absolute inset-0 z-50 bg-cassette-dark flex flex-col font-mono text-white">
             <RunnerHeader title={project.name} onClose={onClose} showViewToggle={false} logCount={0} onToggleSettings={() => setIsSettingsOpen(true)} />
             
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-fade-in bg-noise relative">
-                {/* Background Decoration */}
+            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 gap-4 animate-fade-in bg-noise relative">
                 <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cassette-highlight via-transparent to-transparent"></div>
 
-                <div className="bg-[#1e293b] p-8 sm:p-12 rounded-lg shadow-2xl max-w-md w-full border border-white/10 relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cassette-accent to-transparent opacity-50"></div>
-                    
-                    <div className="w-20 h-20 bg-black rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-white/5 group-hover:scale-110 transition-transform duration-500">
-                        <Globe size={40} className="text-cassette-accent" />
+                <div className="w-full max-w-5xl bg-[#0f172a] border border-white/10 rounded-lg shadow-2xl overflow-hidden relative">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-black/40">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-9 h-9 rounded-full bg-black flex items-center justify-center border border-white/10"><Globe size={18} className="text-cassette-accent" /></div>
+                            <div className="flex flex-col min-w-0">
+                                <span className="font-industrial text-white text-sm truncate">{project.name}</span>
+                                <span className="text-[10px] text-gray-400 truncate">{project.externalUrl}</span>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={handleRefresh} className="px-3 py-2 text-xs rounded bg-white text-black font-bold hover:bg-gray-200">刷新</button>
+                            <button onClick={handleLaunchNative} className="px-3 py-2 text-xs rounded bg-cassette-accent text-black font-bold hover:bg-white flex items-center gap-1">
+                                <ExternalLink size={14} /> 系统打开
+                            </button>
+                        </div>
                     </div>
 
-                    <h2 className="text-2xl font-industrial mb-2 text-white tracking-wide">{project.name}</h2>
-                    <p className="text-gray-400 mb-8 text-sm font-mono break-all line-clamp-2">
-                        {project.externalUrl}
-                    </p>
-
-                    <div className="space-y-4">
-                        <button 
-                            onClick={handleLaunchNative} 
-                            className="w-full bg-cassette-accent text-black rounded-sm px-6 py-4 font-bold hover:bg-white transition-all active:scale-95 uppercase tracking-widest shadow-[0_0_20px_rgba(255,153,0,0.3)] hover:shadow-[0_0_30px_rgba(255,153,0,0.5)] flex items-center justify-center gap-2"
-                        >
-                            <ExternalLink size={20} />
-                            Launch Native
-                        </button>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">
-                            <ShieldCheck size={10} className="inline mr-1" />
-                            Secure Browser Environment
-                        </p>
-                    </div>
+                    <div className="relative bg-black">
+                        {blocked && (
+                          <div className="absolute inset-0 z-20 bg-black/80 text-red-400 flex flex-col items-center justify-center p-4 text-center">
+                            <p className="font-bold mb-2">此域名已被阻止内嵌，改用系统浏览器。</p>
+                            <button onClick={handleLaunchNative} className="px-4 py-2 bg-cassette-accent text-black font-bold rounded">系统打开</button>
+                          </div>
+                        )}
+                        {!blocked && project.externalUrl && (
+                          <iframe
+                            key={externalReloadKey}
+                            src={project.externalUrl}
+                            title="external-viewer"
+                            className="w-full aspect-video bg-black"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+                            allow="camera *; microphone *; geolocation *; autoplay *; clipboard-write; encrypted-media *; picture-in-picture *; fullscreen *"
+                          />
+                        )}
+                        {!blocked && !project.externalUrl && (
+                          <div className="py-12 text-center text-gray-400">未提供可用链接。</div>
+                        )}
+                      </div>
                 </div>
             </div>
 
@@ -235,7 +291,7 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
                             <button onClick={() => setIsSettingsOpen(false)}><X size={24} className="text-gray-400 hover:text-white" /></button>
                         </div>
                          <div className="space-y-5">
-                            <p className="text-xs text-gray-400">External links are handled by the system browser to ensure compatibility with Google Logins and complex web apps.</p>
+                            <p className="text-xs text-gray-400">默认内嵌打开链接；若目标站点禁止 iframe 或在阻止名单，将自动使用系统浏览器。</p>
                             <button onClick={() => setIsSettingsOpen(false)} className="w-full bg-white text-black font-bold py-3 rounded-sm">CLOSE</button>
                          </div>
                     </div>

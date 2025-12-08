@@ -1,5 +1,6 @@
 import { openDB, DBSchema } from 'idb';
 import { Project, ProjectMetadata, LogEntry } from '../types';
+import { persistProjectFiles, loadProjectFiles, removeProjectFiles } from './fileSystemService';
 
 interface RunnerDB extends DBSchema {
   projects: {
@@ -32,13 +33,20 @@ const dbPromise = openDB<RunnerDB>(DB_NAME, DB_VERSION, {
 });
 
 export async function saveProject(project: Project): Promise<void> {
+  // Persist files to native filesystem to avoid WebView storage loss
+  await persistProjectFiles(project);
   const db = await dbPromise;
-  await db.put('projects', project);
+  const { files, ...rest } = project;
+  await db.put('projects', { ...rest, files: {} as any });
 }
 
 export async function updateProject(project: Project): Promise<void> {
+  if (project.type === 'web' && project.files && Object.keys(project.files).length > 0) {
+    await persistProjectFiles(project);
+  }
   const db = await dbPromise;
-  await db.put('projects', project);
+  const { files, ...rest } = project;
+  await db.put('projects', { ...rest, files: {} as any });
 }
 
 export async function toggleProjectPin(id: string): Promise<void> {
@@ -63,7 +71,12 @@ export async function getAllProjects(): Promise<ProjectMetadata[]> {
 
 export async function getProject(id: string): Promise<Project | undefined> {
   const db = await dbPromise;
-  return db.get('projects', id);
+  const meta = await db.get('projects', id);
+  if (!meta) return undefined;
+  if (meta.type !== 'web') return meta;
+
+  const { files, entryPoint } = await loadProjectFiles(id);
+  return { ...meta, files, entryPoint: meta.entryPoint || entryPoint } as Project;
 }
 
 export async function deleteProject(id: string): Promise<void> {
@@ -78,6 +91,7 @@ export async function deleteProject(id: string): Promise<void> {
     cursor = await cursor.continue();
   }
   await tx.done;
+  await removeProjectFiles(id);
 }
 
 // Log / Diary Methods

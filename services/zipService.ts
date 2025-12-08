@@ -249,7 +249,7 @@ export async function processSingleFile(file: File): Promise<Project> {
     };
 }
 
-export async function prepareHtmlForExecution(project: Project, globalApiKey?: string): Promise<string> {
+export async function prepareHtmlForExecution(project: Project, globalApiKey?: string, projectId?: string): Promise<string> {
     if (!project.entryPoint || !project.files[project.entryPoint]) {
         return generateDebugPage(project);
     }
@@ -365,6 +365,137 @@ export async function prepareHtmlForExecution(project: Project, globalApiKey?: s
                     if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
                     _warn.apply(console, args);
                 };
+
+                // Bridge Storage API (Persistent, Native-backed)
+                window.NexusStorage = {
+                    set: function(key, value) {
+                        return new Promise((resolve, reject) => {
+                            const msgId = Date.now() + Math.random();
+                            const handler = (e) => {
+                                if (e.data?.type === 'NEXUS_STORAGE_RESPONSE') {
+                                    window.removeEventListener('message', handler);
+                                    if (e.data.payload.success) resolve();
+                                    else reject(new Error(e.data.payload.error || 'Storage failed'));
+                                }
+                            };
+                            window.addEventListener('message', handler);
+                            window.parent.postMessage({ type: 'NEXUS_STORAGE', payload: { action: 'set', key, value } }, '*');
+                            setTimeout(() => reject(new Error('Storage timeout')), 5000);
+                        });
+                    },
+                    get: function(key) {
+                        return new Promise((resolve, reject) => {
+                            const handler = (e) => {
+                                if (e.data?.type === 'NEXUS_STORAGE_RESPONSE') {
+                                    window.removeEventListener('message', handler);
+                                    if (e.data.payload.success) resolve(e.data.payload.value);
+                                    else reject(new Error(e.data.payload.error || 'Storage failed'));
+                                }
+                            };
+                            window.addEventListener('message', handler);
+                            window.parent.postMessage({ type: 'NEXUS_STORAGE', payload: { action: 'get', key } }, '*');
+                            setTimeout(() => reject(new Error('Storage timeout')), 5000);
+                        });
+                    },
+                    remove: function(key) {
+                        return new Promise((resolve, reject) => {
+                            const handler = (e) => {
+                                if (e.data?.type === 'NEXUS_STORAGE_RESPONSE') {
+                                    window.removeEventListener('message', handler);
+                                    if (e.data.payload.success) resolve();
+                                    else reject(new Error(e.data.payload.error || 'Storage failed'));
+                                }
+                            };
+                            window.addEventListener('message', handler);
+                            window.parent.postMessage({ type: 'NEXUS_STORAGE', payload: { action: 'remove', key } }, '*');
+                            setTimeout(() => reject(new Error('Storage timeout')), 5000);
+                        });
+                    },
+                    clear: function() {
+                        return new Promise((resolve, reject) => {
+                            const handler = (e) => {
+                                if (e.data?.type === 'NEXUS_STORAGE_RESPONSE') {
+                                    window.removeEventListener('message', handler);
+                                    if (e.data.payload.success) resolve();
+                                    else reject(new Error(e.data.payload.error || 'Storage failed'));
+                                }
+                            };
+                            window.addEventListener('message', handler);
+                            window.parent.postMessage({ type: 'NEXUS_STORAGE', payload: { action: 'clear' } }, '*');
+                            setTimeout(() => reject(new Error('Storage timeout')), 5000);
+                        });
+                    },
+                    keys: function() {
+                        return new Promise((resolve, reject) => {
+                            const handler = (e) => {
+                                if (e.data?.type === 'NEXUS_STORAGE_RESPONSE') {
+                                    window.removeEventListener('message', handler);
+                                    if (e.data.payload.success) resolve(e.data.payload.keys || []);
+                                    else reject(new Error(e.data.payload.error || 'Storage failed'));
+                                }
+                            };
+                            window.addEventListener('message', handler);
+                            window.parent.postMessage({ type: 'NEXUS_STORAGE', payload: { action: 'keys' } }, '*');
+                            setTimeout(() => reject(new Error('Storage timeout')), 5000);
+                        });
+                    },
+                    getAll: function() {
+                        return new Promise((resolve, reject) => {
+                            const handler = (e) => {
+                                if (e.data?.type === 'NEXUS_STORAGE_RESPONSE') {
+                                    window.removeEventListener('message', handler);
+                                    if (e.data.payload.success) resolve(e.data.payload.data || {});
+                                    else reject(new Error(e.data.payload.error || 'Storage failed'));
+                                }
+                            };
+                            window.addEventListener('message', handler);
+                            window.parent.postMessage({ type: 'NEXUS_STORAGE', payload: { action: 'getAll' } }, '*');
+                            setTimeout(() => reject(new Error('Storage timeout')), 5000);
+                        });
+                    }
+                };
+                console.log("[Nexus] Bridge Storage API ready: window.NexusStorage");
+
+                // --- AUTO-HIJACK LOCALSTORAGE ---
+                try {
+                    const _mem = {};
+                    
+                    // Hydrate immediately
+                    window.NexusStorage.getAll().then(data => {
+                        if(data) {
+                            Object.assign(_mem, data);
+                            console.log("[Nexus] localStorage hydrated:", Object.keys(data).length, "keys");
+                        }
+                    }).catch(e => console.warn("[Nexus] Hydration failed", e));
+
+                    const _proxy = {
+                        getItem: (key) => _mem[key] || null,
+                        setItem: (key, value) => {
+                            const v = String(value);
+                            _mem[key] = v;
+                            window.NexusStorage.set(key, v).catch(console.error);
+                        },
+                        removeItem: (key) => {
+                            delete _mem[key];
+                            window.NexusStorage.remove(key).catch(console.error);
+                        },
+                        clear: () => {
+                            for(const k in _mem) delete _mem[k];
+                            window.NexusStorage.clear().catch(console.error);
+                        },
+                        key: (i) => Object.keys(_mem)[i] || null,
+                        get length() { return Object.keys(_mem).length; }
+                    };
+
+                    Object.defineProperty(window, 'localStorage', {
+                        value: _proxy,
+                        writable: false,
+                        configurable: true
+                    });
+                    console.log("[Nexus] localStorage hijacked for persistence.");
+                } catch(e) {
+                    console.error("[Nexus] Hijack failed", e);
+                }
             })();
 
             // Console Proxy

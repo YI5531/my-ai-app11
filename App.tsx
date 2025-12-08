@@ -198,7 +198,6 @@ const App: React.FC = () => {
         alert('当前环境或设备不支持桌面快捷方式，请在已安装的安卓 App 中重试。');
         return;
     }
-
     try {
         await PinnedShortcuts.pin({
           id: `shortcut_${project.id}`, // Unique ID
