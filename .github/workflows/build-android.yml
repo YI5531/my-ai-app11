@@ -24,11 +24,11 @@ jobs:
       - name: Build web assets
         run: npm run build
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
-          api-level: 34
-          build-tools: 34.0.0
+          distribution: 'zulu'
+          java-version: '17'
 
       - name: Ensure Android platform exists
         run: |
