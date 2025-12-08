@@ -33,7 +33,7 @@ jobs:
       - name: Ensure Android platform exists
         run: |
           if [ ! -d android ]; then
-            npx cap add android --skip-deps
+            npx cap add android
           fi
 
       - name: Sync Capacitor
