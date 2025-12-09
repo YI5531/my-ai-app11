@@ -7,11 +7,6 @@ const config: CapacitorConfig = {
   bundledWebRuntime: false,
   server: {
     androidScheme: 'https'
-  },
-  plugins: {
-    PinnedShortcuts: {
-      enabled: true
-    }
   }
 };
 
