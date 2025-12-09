@@ -194,29 +194,34 @@ const App: React.FC = () => {
     e.stopPropagation();
     if (navigator.vibrate) navigator.vibrate(20);
 
-    const canPin = Capacitor.isNativePlatform() && typeof PinnedShortcuts?.pin === 'function';
-    if (!canPin) {
-        alert('当前环境或设备不支持桌面快捷方式，请在已安装的安卓 App 中重试。');
+    // 先检查是否支持
+    if (!Capacitor.isNativePlatform()) {
+        alert('桌面快捷方式仅在 Android 应用中可用');
         return;
     }
+
     try {
-        await PinnedShortcuts.pin({
-          id: `shortcut_${project.id}`, // Unique ID
-          shortLabel: project.name,     // Label under icon
-          longLabel: project.name,      // Long press label
-          icon: 'ic_launcher',          // Android Resource Name (mipmap/drawable)
-          intent: `nexus://run?id=${project.id}` // Deep Link Intent
-        });
-        alert('请在弹出的系统窗口中确认添加！');
-    } catch (e) {
-        console.error("Failed to pin shortcut", e);
-        // Fallback logic for web debugging
-        if (!Capacitor.isNativePlatform()) {
-             console.log('Mocking Pin Shortcut on Web:', `nexus://run?id=${project.id}`);
-             alert('Web Dev Mode: Shortcut intent logged to console.');
-        } else {
-             alert('添加失败，可能是权限不足或系统不支持');
+        // 先检查设备是否支持
+        const supportCheck = await PinnedShortcuts.isSupported();
+        if (!supportCheck || !supportCheck.supported) {
+            alert('您的设备或 Android 版本不支持桌面快捷方式（需要 Android 8.0+）');
+            return;
         }
+
+        // 创建快捷方式
+        await PinnedShortcuts.pin({
+          id: `shortcut_${project.id}`,
+          shortLabel: project.name.substring(0, 12), // 限制长度避免被截断
+          longLabel: project.name,
+          icon: 'ic_launcher',
+          intent: `nexus://run?id=${project.id}`
+        });
+        
+        alert('✅ 快捷方式已添加到桌面！');
+    } catch (error: any) {
+        console.error("Failed to pin shortcut", error);
+        const errorMsg = error?.message || error?.toString() || '未知错误';
+        alert(`❌ 添加失败：${errorMsg}\n\n请检查：\n1. Android 版本是否 ≥ 8.0\n2. 启动器是否支持快捷方式\n3. 是否授予了必要权限`);
     }
   };
 
