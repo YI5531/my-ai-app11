@@ -263,7 +263,12 @@ export async function prepareHtmlForExecution(project: Project, globalApiKey?: s
     if (needsBabel && !(window as any).Babel) {
         // Lazy load Babel
         if (typeof (window as any).__loadBabel === 'function') {
-            await (window as any).__loadBabel();
+            try {
+                await (window as any).__loadBabel();
+            } catch (e) {
+                console.error("Babel load failed", e);
+                throw new Error("Failed to load compiler (Babel). Check internet connection.");
+            }
         }
     }
     

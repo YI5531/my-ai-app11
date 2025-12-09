@@ -25,14 +25,28 @@
       window.__loadBabel = function() {
         if (window.__babelLoaded) return Promise.resolve();
         return new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://unpkg.com/@babel/standalone@7.23.5/babel.min.js';
-          script.onload = () => {
-            window.__babelLoaded = true;
-            resolve();
+          const loadScript = (url, fallback) => {
+            const script = document.createElement('script');
+            script.src = url;
+            script.onload = () => {
+              window.__babelLoaded = true;
+              resolve();
+            };
+            script.onerror = () => {
+              if (fallback) {
+                console.warn('Babel CDN failed, trying fallback:', fallback);
+                loadScript(fallback, null);
+              } else {
+                reject(new Error('Failed to load Babel compiler'));
+              }
+            };
+            document.head.appendChild(script);
           };
-          script.onerror = reject;
-          document.head.appendChild(script);
+          // Try cdnjs first (more reliable), then unpkg
+          loadScript(
+            'https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js',
+            'https://unpkg.com/@babel/standalone@7.23.5/babel.min.js'
+          );
         });
       };
     </script>

@@ -130,8 +130,8 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
             setIsLoading(false);
         }
 
-      } catch (e) {
-        setStatusMessage('READ ERROR.');
+      } catch (e: any) {
+        setStatusMessage(`ERROR: ${e.message || 'READ ERROR'}`);
       }
     };
     load();
