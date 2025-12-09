@@ -1,6 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Nexus Runner</string>
-    <string name="title_activity_main">Nexus Runner</string>
+    <string name="app_name">NexusRunnerMobile</string>
+    <string name="title_activity_main">NexusRunnerMobile</string>
     <string name="package_name">com.nexus.runner</string>
-    <string name="custom_url_scheme">nexus</string>
+    <string name="custom_url_scheme">com.nexus.runner</string>
 </resources>
