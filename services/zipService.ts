@@ -338,7 +338,7 @@ export async function prepareHtmlForExecution(project: Project, globalApiKey?: s
 
     // Add common CDN fallbacks
     if (!imports['react']) imports['react'] = 'https://esm.sh/react@18.2.0';
-    if (!imports['react-dom']) imports['react-dom'] = 'https://esm.sh/react-dom@18.2.0/client';
+    if (!imports['react-dom']) imports['react-dom'] = 'https://esm.sh/react-dom@18.2.0';
     if (!imports['react-dom/client']) imports['react-dom/client'] = 'https://esm.sh/react-dom@18.2.0/client';
     if (!imports['lucide-react']) imports['lucide-react'] = 'https://esm.sh/lucide-react@0.263.1';
 

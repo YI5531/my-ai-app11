@@ -201,18 +201,27 @@ const App: React.FC = () => {
     }
 
     try {
-        // 使用 Capacitor App 插件的 canOpenUrl 作为临时解决方案
-        // 创建一个 Deep Link 并提示用户手动添加书签
-        const deepLink = `nexus://run?id=${project.id}`;
+        // 先检查设备是否支持
+        const supportCheck = await PinnedShortcuts.isSupported();
+        if (!supportCheck || !supportCheck.supported) {
+            alert('您的设备或 Android 版本不支持桌面快捷方式（需要 Android 8.0+）');
+            return;
+        }
+
+        // 创建快捷方式
+        await PinnedShortcuts.pin({
+          id: `shortcut_${project.id}`,
+          shortLabel: project.name.substring(0, 12), // 限制长度避免被截断
+          longLabel: project.name,
+          icon: 'ic_launcher',
+          intent: `nexus://run?id=${project.id}`
+        });
         
-        alert(`📌 创建桌面快捷方式：\n\n由于系统限制，请手动操作：\n\n1. 在浏览器中打开:\n${deepLink}\n\n2. 点击"添加到主屏幕"\n\n或者，将此项目标记为"固定"以便快速访问`);
-        
-        // 自动固定项目作为替代方案
-        await toggleProjectPin(project.id);
-        loadProjects();
+        alert('✅ 快捷方式已添加到桌面！');
     } catch (error: any) {
-        console.error("Failed to add shortcut", error);
-        alert(`操作失败：${error?.message || '未知错误'}`);
+        console.error("Failed to pin shortcut", error);
+        const errorMsg = error?.message || error?.toString() || '未知错误';
+        alert(`❌ 添加失败：${errorMsg}\n\n请检查：\n1. Android 版本是否 ≥ 8.0\n2. 启动器是否支持快捷方式\n3. 是否授予了必要权限`);
     }
   };
 
