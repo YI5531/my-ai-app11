@@ -47,18 +47,23 @@ export interface BrowserHistoryItem {
 }
 
 export interface AppConfig {
-  blockedHosts: string[];
+  // 严格阻止的域名（CSP/X-Frame-Options 限制）
+  strictlyBlockedHosts: string[];
+  // 建议使用外部浏览器的域名（用户体验更好）
+  preferExternalHosts: string[];
 }
 
 export const APP_CONFIG: AppConfig = {
-  blockedHosts: [
-    'aistudio.google.com',
-    'generativelanguage.googleapis.com',
-    'colab.research.google.com',
+  // 这些域名因为安全策略无法在 iframe 中加载
+  strictlyBlockedHosts: [
     'accounts.google.com',
-    'google.com',
-    'www.google.com',
-    'youtube.com'
+    'login.microsoftonline.com',
+    'github.com/login',
+  ],
+  // 这些域名可以在 iframe 中加载，但建议使用外部浏览器以获得完整功能
+  preferExternalHosts: [
+    'aistudio.google.com',
+    'colab.research.google.com',
   ]
 };
 

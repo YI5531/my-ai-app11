@@ -258,6 +258,15 @@ export async function prepareHtmlForExecution(project: Project, globalApiKey?: s
     const fileKeys = Object.keys(project.files);
     
     // 1. Pre-process and Transpile JS/TS/React
+    // First, ensure Babel is loaded if we have TS/JSX files
+    const needsBabel = fileKeys.some(k => k.match(/\.(tsx|ts|jsx)$/));
+    if (needsBabel && !(window as any).Babel) {
+        // Lazy load Babel
+        if (typeof (window as any).__loadBabel === 'function') {
+            await (window as any).__loadBabel();
+        }
+    }
+    
     for (const key of fileKeys) {
         const isCode = key.match(/\.(tsx|ts|jsx|js)$/);
         const isCss = key.endsWith('.css');
@@ -456,45 +465,87 @@ export async function prepareHtmlForExecution(project: Project, globalApiKey?: s
                 };
                 console.log("[Nexus] Bridge Storage API ready: window.NexusStorage");
 
-                // --- AUTO-HIJACK LOCALSTORAGE ---
+                // --- AUTO-HIJACK LOCALSTORAGE (改进版：透明代理) ---
                 try {
                     const _mem = {};
+                    const _original = window.localStorage;
+                    let _isHydrated = false;
                     
-                    // Hydrate immediately
+                    // 异步水合，不阻塞页面加载
                     window.NexusStorage.getAll().then(data => {
-                        if(data) {
+                        if(data && typeof data === 'object') {
                             Object.assign(_mem, data);
-                            console.log("[Nexus] localStorage hydrated:", Object.keys(data).length, "keys");
+                            _isHydrated = true;
+                            console.log("[Nexus] localStorage 已水合:", Object.keys(data).length, "个键");
+                            // 触发自定义事件通知应用数据已就绪
+                            window.dispatchEvent(new CustomEvent('nexus-storage-ready', { detail: data }));
                         }
-                    }).catch(e => console.warn("[Nexus] Hydration failed", e));
+                    }).catch(e => {
+                        console.warn("[Nexus] 水合失败，回退到原生 localStorage", e);
+                        _isHydrated = true; // 标记为已尝试，避免无限等待
+                    });
 
+                    // 透明代理：优先使用内存缓存，自动同步到原生存储
                     const _proxy = {
-                        getItem: (key) => _mem[key] || null,
+                        getItem: (key) => {
+                            // 优先返回内存缓存
+                            if (key in _mem) return _mem[key];
+                            // 回退到原生 localStorage（兼容性）
+                            try {
+                                const val = _original.getItem(key);
+                                if (val !== null && _isHydrated) {
+                                    _mem[key] = val; // 同步到内存
+                                }
+                                return val;
+                            } catch (e) {
+                                return null;
+                            }
+                        },
                         setItem: (key, value) => {
                             const v = String(value);
                             _mem[key] = v;
-                            window.NexusStorage.set(key, v).catch(console.error);
+                            // 异步持久化，不阻塞主线程
+                            window.NexusStorage.set(key, v).catch(e => {
+                                console.error("[Nexus] 持久化失败:", key, e);
+                            });
+                            // 同时写入原生 localStorage 作为备份
+                            try {
+                                _original.setItem(key, v);
+                            } catch (e) {
+                                // 忽略配额错误（Nexus Storage 会处理）
+                            }
                         },
                         removeItem: (key) => {
                             delete _mem[key];
                             window.NexusStorage.remove(key).catch(console.error);
+                            try {
+                                _original.removeItem(key);
+                            } catch (e) {}
                         },
                         clear: () => {
                             for(const k in _mem) delete _mem[k];
                             window.NexusStorage.clear().catch(console.error);
+                            try {
+                                _original.clear();
+                            } catch (e) {}
                         },
-                        key: (i) => Object.keys(_mem)[i] || null,
+                        key: (i) => {
+                            const keys = Object.keys(_mem);
+                            return keys[i] !== undefined ? keys[i] : null;
+                        },
                         get length() { return Object.keys(_mem).length; }
                     };
 
+                    // 谨慎替换：保留 configurable 以便调试
                     Object.defineProperty(window, 'localStorage', {
                         value: _proxy,
                         writable: false,
-                        configurable: true
+                        configurable: true // 允许开发者工具覆盖
                     });
-                    console.log("[Nexus] localStorage hijacked for persistence.");
+                    
+                    console.log("[Nexus] localStorage 已劫持（透明代理模式）");
                 } catch(e) {
-                    console.error("[Nexus] Hijack failed", e);
+                    console.error("[Nexus] localStorage 劫持失败，应用将使用原生 localStorage", e);
                 }
             })();
 

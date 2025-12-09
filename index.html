@@ -21,9 +21,21 @@
     <script>
       window.Babel = window.Babel || {};
       window.Babel.availablePlugins = window.Babel.availablePlugins || {};
-      // This helps suppress some transpilation noise if angular files are present
+      // Lazy load Babel only when needed (not on initial page load)
+      window.__loadBabel = function() {
+        if (window.__babelLoaded) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/@babel/standalone@7.23.5/babel.min.js';
+          script.onload = () => {
+            window.__babelLoaded = true;
+            resolve();
+          };
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      };
     </script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <!-- Import Fonts: Russo One (Industrial), Share Tech Mono (Data), Permanent Marker (Handwriting) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

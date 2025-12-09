@@ -13,9 +13,20 @@ const isBlockedHost = (url?: string): boolean => {
     if (!url) return false;
     try {
         const host = new URL(url).hostname.toLowerCase();
-        return APP_CONFIG.blockedHosts.some(b => host === b || host.endsWith(`.${b}`));
+        // 只阻止严格限制的域名
+        return APP_CONFIG.strictlyBlockedHosts.some(b => host === b || host.endsWith(`.${b}`));
     } catch (e) {
         console.warn('URL parse failed for blocklist check', e);
+        return false;
+    }
+};
+
+const shouldPreferExternal = (url?: string): boolean => {
+    if (!url) return false;
+    try {
+        const host = new URL(url).hostname.toLowerCase();
+        return APP_CONFIG.preferExternalHosts.some(b => host === b || host.endsWith(`.${b}`));
+    } catch (e) {
         return false;
     }
 };
@@ -235,6 +246,8 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
   // --- RENDER EXTERNAL URL (INLINE WITH FALLBACK) ---
   if (project?.type === 'external_url') {
       const blocked = isBlockedHost(project.externalUrl);
+      const preferExternal = shouldPreferExternal(project.externalUrl);
+      
       return (
         <div className="absolute inset-0 z-50 bg-cassette-dark flex flex-col font-mono text-white">
             <RunnerHeader title={project.name} onClose={onClose} showViewToggle={false} logCount={0} onToggleSettings={() => setIsSettingsOpen(true)} />
@@ -262,8 +275,13 @@ const RunnerViewer: React.FC<RunnerViewerProps> = ({ projectId, project: initial
                     <div className="relative bg-black">
                         {blocked && (
                           <div className="absolute inset-0 z-20 bg-black/80 text-red-400 flex flex-col items-center justify-center p-4 text-center">
-                            <p className="font-bold mb-2">此域名已被阻止内嵌，改用系统浏览器。</p>
+                            <p className="font-bold mb-2">此域名已被阻止内嵌，请使用系统浏览器。</p>
                             <button onClick={handleLaunchNative} className="px-4 py-2 bg-cassette-accent text-black font-bold rounded">系统打开</button>
+                          </div>
+                        )}
+                        {preferExternal && !blocked && (
+                          <div className="absolute top-2 right-2 z-10 bg-yellow-900/90 border border-yellow-500/50 px-3 py-1 rounded text-xs text-yellow-200 flex items-center gap-1">
+                            💡 建议使用系统浏览器以获得完整功能
                           </div>
                         )}
                         {!blocked && project.externalUrl && (

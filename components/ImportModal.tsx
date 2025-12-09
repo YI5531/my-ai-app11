@@ -18,9 +18,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
   const folderInputRef = useRef<HTMLInputElement>(null);
   const htmlInputRef = useRef<HTMLInputElement>(null);
   const [urlInput, setUrlInput] = useState('');
+  
+  // 检测是否为移动设备，但不强制限制模式
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-  useEffect(() => { if (isMobile) setMode('zip'); }, []);
+  useEffect(() => { 
+    // 移动端默认 ZIP，但用户可以切换
+    if (isMobile && mode !== 'url') setMode('zip'); 
+  }, []);
 
   const handleZipChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -59,9 +64,21 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
 
         <div className="p-6">
           <div className="flex gap-2 mb-6 bg-[#171a21] p-1 rounded-sm">
-            {[{ id: 'zip', label: 'ZIP', icon: Archive }, { id: 'folder', label: 'Folder', icon: Folder }, { id: 'html', label: 'HTML', icon: FileCode }, { id: 'url', label: 'Link', icon: LinkIcon }]
+            {[{ id: 'zip', label: 'ZIP', icon: Archive }, { id: 'folder', label: 'Folder', icon: Folder, disabled: isMobile }, { id: 'html', label: 'HTML', icon: FileCode }, { id: 'url', label: 'Link', icon: LinkIcon }]
             .map((tab) => (
-                <button key={tab.id} onClick={() => setMode(tab.id as any)} className={`flex-1 py-2 text-xs font-bold uppercase rounded-sm flex items-center justify-center gap-2 transition-all ${mode === tab.id ? 'bg-[#2a475e] text-white shadow-md' : 'text-steam-muted hover:text-white hover:bg-white/5'}`}>
+                <button 
+                  key={tab.id} 
+                  onClick={() => !tab.disabled && setMode(tab.id as any)} 
+                  disabled={tab.disabled}
+                  className={`flex-1 py-2 text-xs font-bold uppercase rounded-sm flex items-center justify-center gap-2 transition-all ${
+                    mode === tab.id 
+                      ? 'bg-[#2a475e] text-white shadow-md' 
+                      : tab.disabled 
+                        ? 'text-steam-muted/30 cursor-not-allowed' 
+                        : 'text-steam-muted hover:text-white hover:bg-white/5'
+                  }`}
+                  title={tab.disabled ? '移动端不支持文件夹选择' : ''}
+                >
                   <tab.icon size={14} /> {tab.label}
                 </button>
             ))}

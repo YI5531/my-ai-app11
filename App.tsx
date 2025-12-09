@@ -6,6 +6,7 @@ import RunnerViewer from './components/RunnerViewer';
 import ImportModal from './components/ImportModal';
 import GlobalSettingsModal from './components/GlobalSettingsModal';
 import BrowserView from './components/BrowserView';
+import ErrorBoundary from './components/ErrorBoundary';
 import { Disc, Plus, Settings } from 'lucide-react';
 import { App as CapacitorApp, URLOpenListenerEvent } from '@capacitor/app';
 import { registerPlugin, Capacitor } from '@capacitor/core';
@@ -225,7 +226,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={clsx(
+    <ErrorBoundary fallbackMessage="Nexus Runner 遇到了一个严重错误">
+      <div className={clsx(
         "min-h-screen bg-cassette-dark text-cassette-text font-mono overflow-hidden flex flex-col bg-noise",
         // Only apply safe-area bottom padding if NOT in immersive mode to allow full-screen content
         isImmersive ? "pb-0" : "pb-[env(safe-area-inset-bottom)]"
@@ -339,6 +341,7 @@ const App: React.FC = () => {
         />
       )}
     </div>
+    </ErrorBoundary>
   );
 };
 
