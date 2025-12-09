@@ -260,7 +260,12 @@ export async function prepareHtmlForExecution(project: Project, globalApiKey?: s
     // 1. Pre-process and Transpile JS/TS/React
     // First, ensure Babel is loaded if we have TS/JSX files
     const needsBabel = fileKeys.some(k => k.match(/\.(tsx|ts|jsx)$/));
-    if (needsBabel && !(window as any).Babel) {
+    
+    // Check if Babel is truly ready (has transform method)
+    // Note: window.Babel might exist as an empty object from index.html initialization
+    const isBabelReady = (window as any).Babel && typeof (window as any).Babel.transform === 'function';
+
+    if (needsBabel && !isBabelReady) {
         // Lazy load Babel
         if (typeof (window as any).__loadBabel === 'function') {
             try {
@@ -287,7 +292,7 @@ export async function prepareHtmlForExecution(project: Project, globalApiKey?: s
             content = rewriteImports(content, key);
 
             // Transpile using Babel if available
-            if ((window as any).Babel && key.match(/\.(tsx|ts|jsx)$/)) {
+            if ((window as any).Babel?.transform && key.match(/\.(tsx|ts|jsx)$/)) {
                 try {
                     const result = (window as any).Babel.transform(content, {
                         presets: ['react', 'typescript'],
